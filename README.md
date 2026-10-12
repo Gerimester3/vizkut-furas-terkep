@@ -38,3 +38,17 @@ A **teljes fúrásmélység (talpmélység) nem azonos a vízadó réteg mélys�
 ## Követelmény
 
 Node.js 18+
+
+## Live deploy (Render)
+
+1. Open: https://dashboard.render.com/select-repo?type=web
+2. Connect GitHub if prompted, pick `Gerimester3/vizkut-furas-terkep`
+3. Settings:
+   - Runtime: Node
+   - Build: `npm install --omit=dev`
+   - Start: `npm start`
+   - Instance: Free
+   - Region: Frankfurt (optional)
+4. Create Web Service → wait for deploy URL (`*.onrender.com`)
+
+Repo: https://github.com/Gerimester3/vizkut-furas-terkep
