@@ -1,11 +1,14 @@
-services:
+﻿services:
   - type: web
     name: vizkut-furas-terkep
     runtime: node
     plan: free
-    buildCommand: npm install
+    region: frankfurt
+    buildCommand: npm install --omit=dev
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: NODE_ENV
+        value: production
