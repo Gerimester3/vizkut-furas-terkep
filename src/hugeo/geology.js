@@ -1,0 +1,331 @@
+/**
+ * Surface geology + TVZ identify, rétegsor profile, distance-weighted estimate.
+ */
+
+const {
+  GEOLOGY_IDENTIFY,
+  TVZ_IDENTIFY,
+  MGT_SZINT_IDENTIFY,
+} = require('./sources');
+const { fetchJson } = require('./layers');
+const { getFeatureDepth } = require('../analysis/depth');
+const {
+  depthStats,
+  weightedDepthStats,
+} = require('../analysis/statistics');
+const { haversineMeters, featureLatLon } = require('../analysis/radius');
+
+async function identifySurfaceGeology(lon, lat) {
+  const { mapServer, layerId } = GEOLOGY_IDENTIFY;
+  const params = new URLSearchParams({
+    geometry: `${lon},${lat}`,
+    geometryType: 'esriGeometryPoint',
+    inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: 'NEV,LITOLOGIA,SOR,GEO_HU,geo_ndx,GEO_ID',
+    returnGeometry: 'false',
+    f: 'json',
+  });
+  const url = `${mapServer}/${layerId}/query?${params}`;
+  const data = await fetchJson(url);
+  const attrs = data.features?.[0]?.attributes || null;
+  if (!attrs) {
+    return { found: false, surface: null };
+  }
+  return {
+    found: true,
+    kind: 'TÉNYADAT',
+    surface: {
+      nev: attrs.NEV || null,
+      litologia: attrs.LITOLOGIA || null,
+      sor: attrs.SOR ?? null,
+      geoIndex: attrs.GEO_HU || attrs.geo_ndx || null,
+      geoId: attrs.GEO_ID ?? null,
+    },
+    source: 'HUGEO fdt100 Földtan (felszíni képződmény)',
+  };
+}
+
+async function identifyTalajviz(lon, lat) {
+  const { mapServer, layerId } = TVZ_IDENTIFY;
+  const params = new URLSearchParams({
+    geometry: `${lon},${lat}`,
+    geometryType: 'esriGeometryPoint',
+    inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: '*',
+    returnGeometry: 'false',
+    f: 'json',
+  });
+  const url = `${mapServer}/${layerId}/query?${params}`;
+  const data = await fetchJson(url);
+  const attrs = data.features?.[0]?.attributes || null;
+  if (!attrs) {
+    return { found: false, talajviz: null };
+  }
+  return {
+    found: true,
+    kind: 'TÉNYADAT',
+    talajviz: {
+      kod: attrs.tvz_kod || null,
+      objectId: attrs.OBJECTID ?? null,
+    },
+    source: 'HUGEO TVZ 1:100 000 — talajvízszint mélysége a felszín alatt',
+    note: 'Térképi kategória, nem kútspecifikus mérés.',
+  };
+}
+
+/**
+ * Regional MGT formation-bottom depth bands at a point.
+ * TÉNYADAT for the model map — NOT clay/aquifer intervals of a well.
+ */
+async function identifyMgtSzintek(lon, lat) {
+  const { mapServer, layers } = MGT_SZINT_IDENTIFY;
+  const results = await Promise.all(
+    layers.map(async (layer) => {
+      const params = new URLSearchParams({
+        geometry: `${lon},${lat}`,
+        geometryType: 'esriGeometryPoint',
+        inSR: '4326',
+        spatialRel: 'esriSpatialRelIntersects',
+        outFields: '*',
+        returnGeometry: 'false',
+        f: 'json',
+      });
+      const url = `${mapServer}/${layer.id}/query?${params}`;
+      try {
+        const data = await fetchJson(url);
+        const attrs = data.features?.[0]?.attributes || null;
+        if (!attrs) {
+          return { layerId: layer.id, label: layer.label, found: false };
+        }
+        return {
+          layerId: layer.id,
+          label: layer.label,
+          found: true,
+          melyseg: attrs.melyseg ?? null,
+          level: attrs.level ?? null,
+          objectId: attrs.OBJECTID ?? null,
+        };
+      } catch (err) {
+        return {
+          layerId: layer.id,
+          label: layer.label,
+          found: false,
+          error: err.message,
+        };
+      }
+    })
+  );
+
+  const found = results.filter((r) => r.found);
+  return {
+    found: found.length > 0,
+    kind: 'TÉNYADAT',
+    levels: results,
+    source: 'HUGEO geoterm/MGT_fdt_szint — regionális földtani szint talpmélység-sávok',
+    note:
+      'Regionális modell. Nem kútrétegsor, nem agyag/vízadó intervallum. A teljes fúrásmélység sem azonos a vízadó mélységével.',
+  };
+}
+
+/**
+ * Identify at point: geology + TVZ + MGT formation depth bands.
+ */
+async function identifyAtPoint(lon, lat) {
+  const [geology, talajviz, mgtSzintek] = await Promise.all([
+    identifySurfaceGeology(lon, lat).catch((err) => ({
+      found: false,
+      surface: null,
+      error: err.message,
+    })),
+    identifyTalajviz(lon, lat).catch((err) => ({
+      found: false,
+      talajviz: null,
+      error: err.message,
+    })),
+    identifyMgtSzintek(lon, lat).catch((err) => ({
+      found: false,
+      levels: [],
+      error: err.message,
+    })),
+  ]);
+  return {
+    coordinates: { lon, lat },
+    geology,
+    talajviz,
+    mgtSzintek,
+  };
+}
+
+function buildStratumProfile({
+  surface,
+  totalDepth,
+  props = {},
+  talajviz = null,
+  mgtLevels = null,
+}) {
+  const hasVfdt =
+    props.isVfdt_npl === 'Igen' ||
+    props.isVfdt_npl === 'I' ||
+    props.isVfdt_npl === true;
+  const detail = props.verzio_max || null;
+
+  const layers = [];
+  if (surface?.litologia || surface?.nev) {
+    layers.push({
+      fromM: 0,
+      toM: null,
+      label: surface.nev || surface.litologia,
+      litologia: surface.litologia,
+      kind: 'surface',
+      certainty: 'TÉNYADAT',
+      note: 'Felszíni földtani képződmény (1:100 000)',
+    });
+  }
+
+  if (talajviz?.kod) {
+    layers.push({
+      fromM: null,
+      toM: null,
+      label: `Talajvízszint kategória: ${talajviz.kod}`,
+      litologia: null,
+      kind: 'groundwater_map',
+      certainty: 'TÉNYADAT',
+      note: 'TVZ térképi kategória — nem azonos a vízadó intervallummal',
+    });
+  }
+
+  for (const lvl of mgtLevels || []) {
+    if (!lvl?.found || !lvl.melyseg) continue;
+    layers.push({
+      fromM: null,
+      toM: null,
+      label: `${lvl.label}: ${lvl.melyseg}`,
+      litologia: null,
+      kind: 'mgt_level',
+      certainty: 'TÉNYADAT',
+      note: 'Regionális MGT modell — nem kútrétegsor',
+    });
+  }
+
+  if (totalDepth != null) {
+    layers.push({
+      fromM: null,
+      toM: totalDepth,
+      label: 'Talpmélység',
+      litologia: null,
+      kind: 'bottom',
+      certainty: 'TÉNYADAT',
+      note: 'Teljes fúrásmélység — nem vízadó mélység',
+    });
+  }
+
+  return {
+    layers,
+    hasStructuredLog: false,
+    aquiferInterval: null,
+    aquiferIntervalKind:
+      'nincs TÉNYADAT — strukturált rétegsor / szűrőzés nem érhető el REST-en',
+    hasVfdtFlag: hasVfdt,
+    detailLevel: detail,
+    message: hasVfdt
+      ? 'A forrás szerint vízföldtani napló elérhető a HUGEO-n, de strukturált rétegintervallumok ehhez a REST szolgáltatáshoz nem kapcsolódnak.'
+      : 'Strukturált rétegsor (intervallumonkénti litológia / szűrőzés) nem érhető el ezen a szolgáltatáson.',
+  };
+}
+
+/**
+ * Distance-weighted drilling-depth estimate — BECSLÉS only, never aquifer depth.
+ */
+function estimateAquifer({
+  centerLat,
+  centerLon,
+  features,
+  surface,
+  depthField = null,
+  radiusKm = 10,
+}) {
+  const radiusM = radiusKm * 1000;
+  const nearby = [];
+  for (const f of features || []) {
+    const ll = featureLatLon(f);
+    if (!ll) continue;
+    const dist = haversineMeters(centerLat, centerLon, ll.lat, ll.lon);
+    if (dist > radiusM) continue;
+    const { depth } = getFeatureDepth(f, depthField);
+    nearby.push({ distanceM: dist, depth });
+  }
+
+  const depths = nearby.map((n) => n.depth);
+  const stats = depthStats(depths);
+  const weighted = weightedDepthStats(nearby);
+  const hasSurface = Boolean(surface?.litologia || surface?.nev);
+
+  if (stats.withDepth < 3) {
+    return {
+      available: false,
+      kind: 'BECSLÉS',
+      reason:
+        'Nincs elég közeli fúrás mélységadattal a becsléshez (legalább 3 kell).',
+      confidence: 'nincs',
+      confidenceScore: 0,
+      estimatedDepthM: null,
+      rangeM: null,
+      nearbyCount: nearby.length,
+      withDepth: stats.withDepth,
+      surfaceUsed: hasSurface,
+    };
+  }
+
+  const center = weighted.weightedMedian ?? stats.median;
+  const spread = Math.max(20, (stats.max - stats.min) * 0.25);
+  const low = Math.max(0, center - spread);
+  const high = center + spread;
+
+  // Confidence score 0–100 from sample size, distance concentration, surface context
+  const avgDist =
+    nearby.reduce((a, b) => a + b.distanceM, 0) / Math.max(1, nearby.length);
+  let score = 15;
+  score += Math.min(35, stats.withDepth * 1.2);
+  score += hasSurface ? 10 : 0;
+  score += avgDist < 3000 ? 20 : avgDist < 7000 ? 10 : 0;
+  score += stats.withDepth >= 30 ? 10 : 0;
+  score = Math.min(70, Math.round(score)); // cap: no structured log ⇒ never high
+
+  let confidence = 'alacsony';
+  if (score >= 55) confidence = 'közepes';
+  else if (score >= 40) confidence = 'közepes-alacsony';
+
+  return {
+    available: true,
+    kind: 'BECSLÉS',
+    disclaimer:
+      'Ez NEM vízadó réteg mélység. Távolság-súlyozott talpmélység-sáv; rétegsor nélkül legfeljebb közepes bizonyosság.',
+    confidence,
+    confidenceScore: score,
+    estimatedDepthM: center,
+    rangeM: { min: low, max: high },
+    nearbyCount: nearby.length,
+    withDepth: stats.withDepth,
+    stats: {
+      average: stats.average,
+      median: stats.median,
+      weightedMedian: weighted.weightedMedian,
+      weightedAverage: weighted.weightedAverage,
+      min: stats.min,
+      max: stats.max,
+    },
+    surfaceUsed: hasSurface,
+    surfaceLabel: surface?.nev || surface?.litologia || null,
+  };
+}
+
+module.exports = {
+  identifySurfaceGeology,
+  identifyTalajviz,
+  identifyMgtSzintek,
+  identifyAtPoint,
+  buildStratumProfile,
+  estimateAquifer,
+};

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nyugat-Dunántúl fúrási térkép — HUGEO</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="panel" id="panel">
+        <header class="panel-header">
+          <h1>Nyugat-Dunántúl fúrási térkép</h1>
+          <p class="subtitle">
+            Hivatalos HUGEO / SZTFH fúrási pontok — nem demo adatok
+          </p>
+        </header>
+
+        <form class="search-form" id="searchForm">
+          <label class="sr-only" for="searchInput">Település vagy cím</label>
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Település vagy cím (pl. Pápa)"
+            autocomplete="off"
+          />
+          <button type="submit">Keresés</button>
+        </form>
+
+        <section class="section">
+          <h2>Fúrási források</h2>
+          <div id="sourceToggles" class="check-list"></div>
+        </section>
+
+        <section class="section">
+          <h2>Fúrás jellege</h2>
+          <p class="hint">Adattári <code>jelleg</code> mező (HUGEO ADT) — FRS_ID alapján.</p>
+          <label>
+            Gyorsszűrő
+            <select id="jellegPreset">
+              <option value="all">Összes jelleg</option>
+              <option value="vizkutato">Vízkutató / vízföldtani</option>
+              <option value="nem_viz">Nem vízkutató</option>
+              <option value="terkepezo">Térképező / mérnökgeológia</option>
+              <option value="nyersanyag">Nyersanyagkutató</option>
+              <option value="unknown">Ismeretlen jelleg</option>
+            </select>
+          </label>
+          <div id="jellegValues" class="check-list jelleg-list"></div>
+          <label class="inline-check">
+            <input type="checkbox" id="includeUnknownJelleg" checked />
+            Ismeretlen jelleg is (ha nem „Ismeretlen” preset)
+          </label>
+        </section>
+
+        <section class="section">
+          <h2>Térképrétegek</h2>
+          <div id="overlayToggles" class="check-list"></div>
+          <label class="opacity-label">
+            Overlay átlátszóság
+            <input type="range" id="overlayOpacity" min="10" max="90" value="55" />
+            <span id="overlayOpacityVal">55%</span>
+          </label>
+          <div id="overlayLegend" class="overlay-legend"></div>
+          <label class="inline-check">
+            <input type="checkbox" id="identifyMode" />
+            Kattintásra földtan / TVZ identify
+          </label>
+        </section>
+
+        <div class="controls">
+          <div class="year-filter">
+            <div class="year-filter-head">
+              <span>Mélység (m)</span>
+              <span id="depthRangeLabel">0 – 1000</span>
+            </div>
+            <div class="dual-range">
+              <input type="range" id="depthMin" min="0" max="1000" value="0" step="5" />
+              <input type="range" id="depthMax" min="0" max="1000" value="1000" step="5" />
+            </div>
+            <label class="inline-check">
+              <input type="checkbox" id="includeUnknownDepth" checked />
+              Ismeretlen mélység is
+            </label>
+          </div>
+
+          <div class="year-filter">
+            <div class="year-filter-head">
+              <span>Fúrás éve</span>
+              <span id="yearRangeLabel">1825 – 2022</span>
+            </div>
+            <div class="dual-range">
+              <input type="range" id="yearMin" min="1825" max="2022" value="1825" />
+              <input type="range" id="yearMax" min="1825" max="2022" value="2022" />
+            </div>
+            <label class="inline-check">
+              <input type="checkbox" id="includeUnknownYear" checked />
+              Ismeretlen év is
+            </label>
+          </div>
+
+          <label>
+            Elemzési sugár
+            <select id="radiusKm">
+              <option value="5">5 km</option>
+              <option value="10" selected>10 km</option>
+              <option value="20">20 km</option>
+            </select>
+          </label>
+
+          <div class="btn-row">
+            <button type="button" id="pickPointBtn" class="btn-secondary">
+              Pont kijelölése
+            </button>
+            <button type="button" id="compareModeBtn" class="btn-secondary">
+              Összehasonlítás
+            </button>
+          </div>
+
+          <div class="coord-paste">
+            <label>
+              3D → 2D koordináta
+              <input
+                id="coordPaste"
+                type="text"
+                placeholder="lat, lon (pl. 47.33, 17.47)"
+              />
+            </label>
+            <button type="button" id="gotoCoordBtn" class="btn-secondary">
+              Ugrás
+            </button>
+          </div>
+        </div>
+
+        <section class="stats" id="stats">
+          <div class="stat">
+            <span class="stat-label">Fúrások</span>
+            <span class="stat-value" id="statCount">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Átlagmélység</span>
+            <span class="stat-value" id="statAvg">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Minimum</span>
+            <span class="stat-value" id="statMin">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Maximum</span>
+            <span class="stat-value" id="statMax">—</span>
+          </div>
+        </section>
+
+        <section class="section tools">
+          <h2>Export / jelentés</h2>
+          <div class="btn-row">
+            <button type="button" id="exportGeoBtn" class="btn-secondary">GeoJSON</button>
+            <button type="button" id="exportCsvBtn" class="btn-secondary">CSV</button>
+          </div>
+          <button type="button" id="reportBtn" class="btn-secondary">
+            Nyomtatható jelentés
+          </button>
+          <button type="button" id="copyViewBtn" class="btn-secondary">
+            Nézet URL másolása
+          </button>
+        </section>
+
+        <section class="analysis" id="analysisBox" hidden>
+          <h2>Sugárelemzés</h2>
+          <div id="analysisContent"></div>
+          <div id="histogram" class="histogram"></div>
+          <div id="compareTable"></div>
+        </section>
+
+        <section class="section" id="compareBox" hidden>
+          <h2>Pontok összehasonlítása</h2>
+          <div id="comparePoints"></div>
+          <button type="button" id="clearCompareBtn" class="btn-secondary">
+            Összehasonlítás törlése
+          </button>
+        </section>
+
+        <section class="section" id="identifyBox" hidden>
+          <h2>Identify (TÉNYADAT)</h2>
+          <div id="identifyContent"></div>
+        </section>
+
+        <section class="section" id="profileBox" hidden>
+          <h2>Rétegsor / profil</h2>
+          <div id="profileContent"></div>
+        </section>
+
+        <section class="section">
+          <h2>HUGEO 3D Geológia</h2>
+          <p class="hint">
+            Másold ki a koordinátát a 3D nézőből, majd illeszd be fent.
+          </p>
+          <a
+            class="btn-link"
+            id="open3d"
+            href="https://map.hugeo.hu/3d_foldtan/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >3D néző megnyitása</a
+          >
+          <button type="button" id="embed3dBtn" class="btn-secondary">
+            3D beágyazás (panel)
+          </button>
+          <div id="embed3dWrap" class="embed3d" hidden>
+            <iframe
+              id="embed3d"
+              title="HUGEO 3D Geológia"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            ></iframe>
+          </div>
+        </section>
+
+        <section class="legend">
+          <h2>Mélységszínezés</h2>
+          <ul>
+            <li><span class="dot" style="background:#2563eb"></span> 0–50 m</li>
+            <li><span class="dot" style="background:#f97316"></span> 50–100 m</li>
+            <li><span class="dot" style="background:#dc2626"></span> 100–200 m</li>
+            <li><span class="dot" style="background:#7c3aed"></span> 200+ m</li>
+            <li><span class="dot" style="background:#6b7280"></span> nincs adat</li>
+          </ul>
+          <p class="disclaimer">
+            A teljes fúrásmélység <strong>nem</strong> azonos a vízadó réteg
+            mélységével.
+          </p>
+        </section>
+
+        <section class="diagnostics" id="diagnostics">
+          <h2>Diagnosztika</h2>
+          <pre id="diagText">Kapcsolódás…</pre>
+        </section>
+
+        <footer class="panel-footer">
+          Adatforrás:
+          <a href="https://map.hugeo.hu/" target="_blank" rel="noopener noreferrer"
+            >HUGEO</a
+          >
+          / SZTFH
+        </footer>
+      </aside>
+
+      <main class="map-wrap">
+        <div id="map"></div>
+        <div class="status-bar" id="statusBar">Indítás…</div>
+        <div class="map-toolbar">
+          <button type="button" class="toggle-panel" id="togglePanel" aria-label="Panel">
+            ☰
+          </button>
+          <button type="button" id="fullscreenBtn" class="map-tool-btn" title="Teljes képernyő">
+            ⛶
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
