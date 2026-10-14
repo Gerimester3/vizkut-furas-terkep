@@ -34,6 +34,7 @@ const {
   enrichFeaturesWithJelleg,
   collectJellegValues,
 } = require('./src/hugeo/jelleg');
+const { translateOneGeologyLabel } = require('./src/hugeo/onegeologyHu');
 
 const PORT = Number(process.env.PORT) || 3000;
 const WMS_URL =
@@ -635,10 +636,13 @@ app.get('/api/overlay/:overlayId/legend', async (req, res) => {
         layerName: layer.layerName || overlay.label,
         items: (layer.legend || [])
           .filter((item) => item.imageData)
-          .map((item) => ({
-            label: String(item.label || '').trim() || layer.layerName || '—',
-            image: `data:${item.contentType || 'image/png'};base64,${item.imageData}`,
-          })),
+          .map((item) => {
+            const raw = String(item.label || '').trim() || layer.layerName || '—';
+            return {
+              label: overlay.id === 'onegeology' ? translateOneGeologyLabel(raw) : raw,
+              image: `data:${item.contentType || 'image/png'};base64,${item.imageData}`,
+            };
+          }),
       }))
       .filter((group) => group.items.length);
 
