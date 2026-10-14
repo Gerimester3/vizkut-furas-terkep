@@ -716,6 +716,99 @@
     }
   }
 
+  function appendIdentifyHit(parent, overlay, hit) {
+    const title = document.createElement('p');
+    title.className = 'identify-title';
+    const showLayer = (overlay.hits || []).filter((row) => row.found).length > 1;
+    title.textContent = showLayer ? `${hit.layerName}: ${hit.title}` : hit.title;
+    parent.appendChild(title);
+    for (const line of hit.lines || []) {
+      const row = document.createElement('p');
+      row.className = 'hint';
+      row.textContent = `${line.label}: ${line.value}`;
+      parent.appendChild(row);
+    }
+  }
+
+  function renderOverlayIdentify(lat, lon, data) {
+    el.identifyBox.hidden = false;
+    el.identifyContent.replaceChildren();
+    const intro = document.createElement('p');
+    intro.className = 'hint';
+    intro.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    el.identifyContent.appendChild(intro);
+
+    const popup = document.createElement('div');
+    popup.className = 'identify-popup-body';
+
+    for (const overlay of data.overlays || []) {
+      const block = document.createElement('div');
+      block.className = 'identify-overlay';
+      const heading = document.createElement('h3');
+      heading.textContent = overlay.label;
+      block.appendChild(heading);
+      const found = (overlay.hits || []).filter((hit) => hit.found);
+      const failed = (overlay.hits || []).filter((hit) => hit.error);
+      if (!found.length) {
+        const empty = document.createElement('p');
+        empty.className = 'hint';
+        empty.textContent = failed[0]?.error || 'Ezen a ponton nincs adat.';
+        block.appendChild(empty);
+      }
+      for (const hit of found) appendIdentifyHit(block, overlay, hit);
+      el.identifyContent.appendChild(block);
+
+      const popBlock = document.createElement('div');
+      const popHeading = document.createElement('strong');
+      popHeading.textContent = overlay.label;
+      popBlock.appendChild(popHeading);
+      if (!found.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'nincs adat';
+        popBlock.appendChild(empty);
+      }
+      for (const hit of found) appendIdentifyHit(popBlock, overlay, hit);
+      popup.appendChild(popBlock);
+    }
+
+    L.popup({ maxWidth: 320, className: 'identify-popup' })
+      .setLatLng([lat, lon])
+      .setContent(popup)
+      .openOn(map);
+    if (el.panel.classList.contains('open') || window.innerWidth > 860) {
+      el.identifyBox.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  async function identifyVisibleOverlays(lat, lon) {
+    const ids = checkedOverlayIds();
+    el.identifyBox.hidden = false;
+    el.identifyContent.textContent = 'Réteg azonosítása…';
+    if (identifyMarker) map.removeLayer(identifyMarker);
+    identifyMarker = L.circleMarker([lat, lon], {
+      radius: 6,
+      color: '#fff',
+      fillColor: '#22c55e',
+      fillOpacity: 1,
+      weight: 2,
+    }).addTo(map);
+    if (!ids.length) {
+      el.identifyContent.textContent =
+        'Kapcsolj be egy térképréteget, aztán kattints a térképre.';
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/overlay/identify?lat=${lat}&lon=${lon}&ids=${encodeURIComponent(ids.join(','))}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Réteg azonosítás hiba');
+      renderOverlayIdentify(lat, lon, data);
+    } catch (err) {
+      el.identifyContent.textContent = err.message;
+    }
+  }
+
   async function runIdentify(lat, lon) {
     el.identifyBox.hidden = false;
     el.identifyContent.textContent = 'Identify…';
@@ -1107,7 +1200,7 @@
   map.on('click', async (e) => {
     const { lat, lng: lon } = e.latlng;
     if (el.identifyMode.checked && !pickMode && !compareMode) {
-      await runIdentify(lat, lon);
+      await identifyVisibleOverlays(lat, lon);
       return;
     }
     if (compareMode) {

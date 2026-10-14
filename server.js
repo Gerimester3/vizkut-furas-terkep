@@ -21,6 +21,7 @@ const {
 } = require('./src/hugeo/sources');
 const {
   identifyAtPoint,
+  identifyOverlays,
   buildStratumProfile,
   estimateAquifer,
 } = require('./src/hugeo/geology');
@@ -297,6 +298,30 @@ app.get('/api/geology/at', async (req, res) => {
     res.json(identified);
   } catch (err) {
     res.status(502).json({ error: err.message, found: false });
+  }
+});
+
+app.get('/api/overlay/identify', async (req, res) => {
+  try {
+    const lon = Number(req.query.lon);
+    const lat = Number(req.query.lat);
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+      return res.status(400).json({ error: 'lon és lat kötelező' });
+    }
+    const ids = String(req.query.ids || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => OVERLAYS[id]);
+    if (!ids.length) {
+      return res.status(400).json({ error: 'Nincs bekapcsolt térképréteg' });
+    }
+    const overlays = await identifyOverlays(lon, lat, ids);
+    res.json({
+      coordinates: { lon, lat },
+      overlays,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message, overlays: [] });
   }
 });
 

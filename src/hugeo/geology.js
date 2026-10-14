@@ -6,6 +6,7 @@ const {
   GEOLOGY_IDENTIFY,
   TVZ_IDENTIFY,
   MGT_SZINT_IDENTIFY,
+  OVERLAYS,
 } = require('./sources');
 const { fetchJson } = require('./layers');
 const { getFeatureDepth } = require('../analysis/depth');
@@ -321,11 +322,184 @@ function estimateAquifer({
   };
 }
 
+/** Layer names taken from each MapServer layer's published name. */
+const OVERLAY_LAYER_NAMES = {
+  foldtan100: { 6: 'Földtan' },
+  foldtan500: { 30: 'Felszíni földtan' },
+  pretercier: {
+    7: 'Prekainozoos földtan',
+    6: 'Felszíni kibukkanás',
+  },
+  termalviz: { 1: 'Karszt', 2: 'Porózus' },
+  onegeology: { 2: 'Felszíni képződmény' },
+  talajviz: { 0: 'Talajvízszint' },
+  mgtSzintek: {
+    0: 'Kvarter talp',
+    1: 'Felső-pannóniai talp',
+    2: 'Pannóniai talp',
+    3: 'Prekainozoos aljzat felszíne',
+  },
+};
+
+function detailLine(label, value) {
+  if (value == null || String(value).trim() === '') return null;
+  return { label, value: String(value).trim() };
+}
+
+function formatFoldtan100(attrs) {
+  return {
+    title: attrs.NEV || attrs.LITOLOGIA || attrs.GEO_HU || null,
+    lines: [
+      detailLine('Kőzet', attrs.LITOLOGIA),
+      detailLine('Jelkulcs', attrs.GEO_HU),
+    ].filter(Boolean),
+  };
+}
+
+function formatFoldtan500(attrs) {
+  const title = [attrs.Kod, attrs.leiras].filter(Boolean).join(' — ');
+  return {
+    title: title || null,
+    lines: [detailLine('Angol név', attrs.english)].filter(Boolean),
+  };
+}
+
+function formatPretercier(attrs) {
+  return {
+    title: attrs.kozet_en || attrs.kod_uj_szoveg || null,
+    lines: [detailLine('Kód', attrs.kod_uj_szoveg)].filter(Boolean),
+  };
+}
+
+function formatTermal(attrs, layerName) {
+  return {
+    title: attrs.viztest_ne || layerName,
+    lines: [
+      detailLine('Típus', layerName),
+      detailLine('Alegység', attrs.alegyseg),
+      detailLine('Vízadó', attrs.vizado_tip),
+      detailLine('Földtani típus', attrs.foldtani_t),
+    ].filter(Boolean),
+  };
+}
+
+function formatOneGeology(attrs) {
+  return {
+    title: attrs.gu_name || null,
+    lines: [detailLine('Leírás', attrs.gu_descrip)].filter(Boolean),
+  };
+}
+
+function formatTalajviz(attrs) {
+  return { title: attrs.tvz_kod || null, lines: [] };
+}
+
+function formatMelyseg(attrs) {
+  const band = attrs.melyseg ? String(attrs.melyseg).trim() : '';
+  return { title: band ? `${band} m` : null, lines: [] };
+}
+
+const OVERLAY_FORMATTERS = {
+  foldtan100: { 6: formatFoldtan100 },
+  foldtan500: { 30: formatFoldtan500 },
+  pretercier: {
+    7: formatPretercier,
+    6: () => ({
+      title: 'A prekainozoos aljzat a felszínen kibukkan',
+      lines: [],
+    }),
+  },
+  termalviz: { 1: formatTermal, 2: formatTermal },
+  onegeology: { 2: formatOneGeology },
+  talajviz: { 0: formatTalajviz },
+  mgtSzintek: {
+    0: formatMelyseg,
+    1: formatMelyseg,
+    2: formatMelyseg,
+    3: formatMelyseg,
+  },
+};
+
+async function queryPointAttributes(mapServer, layerId, lon, lat) {
+  const params = new URLSearchParams({
+    geometry: `${lon},${lat}`,
+    geometryType: 'esriGeometryPoint',
+    inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: '*',
+    returnGeometry: 'false',
+    f: 'json',
+  });
+  const data = await fetchJson(`${mapServer}/${layerId}/query?${params}`);
+  if (data.error) {
+    throw new Error(data.error.message || 'HUGEO identify hiba');
+  }
+  return data.features?.[0]?.attributes || null;
+}
+
+/**
+ * Name the map unit under a click for the overlays the user actually turned on.
+ * Colors on these maps are often near-duplicates; the attribute is the legend name.
+ */
+async function identifyOverlays(lon, lat, overlayIds) {
+  const unique = [...new Set(overlayIds)].filter((id) => OVERLAYS[id]);
+  const overlays = await Promise.all(
+    unique.map(async (id) => {
+      const overlay = OVERLAYS[id];
+      const formatters = OVERLAY_FORMATTERS[id] || {};
+      const layerIds = overlay.legendLayers || [];
+      const hits = await Promise.all(
+        layerIds.map(async (layerId) => {
+          const layerName = OVERLAY_LAYER_NAMES[id]?.[layerId] || String(layerId);
+          try {
+            const attrs = await queryPointAttributes(
+              overlay.mapServer,
+              layerId,
+              lon,
+              lat
+            );
+            if (!attrs) {
+              return { layerId, layerName, found: false };
+            }
+            const format = formatters[layerId];
+            const view = format
+              ? format(attrs, layerName)
+              : { title: null, lines: [] };
+            if (!view?.title) {
+              return { layerId, layerName, found: false };
+            }
+            const lines = (view.lines || []).filter(
+              (row) => row.value && row.value !== view.title
+            );
+            return {
+              layerId,
+              layerName,
+              found: true,
+              title: view.title,
+              lines,
+            };
+          } catch (err) {
+            return {
+              layerId,
+              layerName,
+              found: false,
+              error: err.message,
+            };
+          }
+        })
+      );
+      return { id, label: overlay.label, hits };
+    })
+  );
+  return overlays;
+}
+
 module.exports = {
   identifySurfaceGeology,
   identifyTalajviz,
   identifyMgtSzintek,
   identifyAtPoint,
+  identifyOverlays,
   buildStratumProfile,
   estimateAquifer,
 };

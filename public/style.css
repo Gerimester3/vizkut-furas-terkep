@@ -685,6 +685,30 @@ body {
   border-radius: 2px;
 }
 
+.identify-overlay {
+  margin-top: 0.55rem;
+}
+
+.identify-overlay h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.identify-title {
+  margin: 0.15rem 0;
+  font-weight: 650;
+}
+
+.identify-popup .leaflet-popup-content {
+  margin: 10px 12px;
+}
+
+.identify-popup-body strong {
+  display: block;
+  margin-top: 0.35rem;
+}
+
 .overlay-legend .leg-item {
   display: flex;
   align-items: center;
