@@ -569,6 +569,66 @@ app.get('/api/overlay/:overlayId/tile/:z/:y/:x', async (req, res) => {
   }
 });
 
+const legendCache = new Map();
+const LEGEND_TTL_MS = 6 * 60 * 60 * 1000;
+
+function legendLayerIds(overlay) {
+  if (Array.isArray(overlay.legendLayers) && overlay.legendLayers.length) {
+    return overlay.legendLayers;
+  }
+  const match = String(overlay.layers || '').match(/show:([0-9,]+)/);
+  if (!match) return [];
+  return match[1]
+    .split(',')
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n));
+}
+
+/** Official HUGEO legend swatches for the layers actually drawn. */
+app.get('/api/overlay/:overlayId/legend', async (req, res) => {
+  try {
+    const overlay = OVERLAYS[req.params.overlayId];
+    if (!overlay) {
+      return res.status(404).json({ error: 'Ismeretlen overlay' });
+    }
+    const cached = legendCache.get(overlay.id);
+    if (cached && Date.now() - cached.at < LEGEND_TTL_MS) {
+      return res.json(cached.body);
+    }
+    const ids = new Set(legendLayerIds(overlay));
+    const upstream = await fetch(`${overlay.mapServer}/legend?f=pjson`, {
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: `Jelmagyarázat HTTP ${upstream.status}` });
+    }
+    const data = await upstream.json();
+    const groups = (data.layers || [])
+      .filter((layer) => ids.has(layer.layerId))
+      .map((layer) => ({
+        layerId: layer.layerId,
+        layerName: layer.layerName || overlay.label,
+        items: (layer.legend || [])
+          .filter((item) => item.imageData)
+          .map((item) => ({
+            label: String(item.label || '').trim() || layer.layerName || '—',
+            image: `data:${item.contentType || 'image/png'};base64,${item.imageData}`,
+          })),
+      }))
+      .filter((group) => group.items.length);
+
+    const body = {
+      id: overlay.id,
+      label: overlay.label,
+      groups,
+    };
+    legendCache.set(overlay.id, { at: Date.now(), body });
+    res.json(body);
+  } catch (err) {
+    res.status(502).json({ error: err.message, groups: [] });
+  }
+});
+
 /** Dynamic ArcGIS export (non-cached overlays) */
 app.get('/api/overlay/:overlayId/export', async (req, res) => {
   try {

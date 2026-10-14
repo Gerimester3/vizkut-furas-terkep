@@ -32,6 +32,7 @@
     identifyMode: document.getElementById('identifyMode'),
     panel: document.getElementById('panel'),
     togglePanel: document.getElementById('togglePanel'),
+    closePanel: document.getElementById('closePanel'),
     fullscreenBtn: document.getElementById('fullscreenBtn'),
     sourceToggles: document.getElementById('sourceToggles'),
     jellegPreset: document.getElementById('jellegPreset'),
@@ -79,6 +80,8 @@
   const compareList = [];
   const compareMarkers = [];
   const exportLayers = {};
+  const legendByOverlay = {};
+  let legendToken = 0;
 
   const map = L.map('map', {
     zoomControl: true,
@@ -915,36 +918,125 @@
     return { lat: a, lon: b };
   }
 
+  function checkedOverlayIds() {
+    return [...el.overlayToggles.querySelectorAll('input:checked')].map((i) => i.value);
+  }
+
+  function renderLegendDom(entries) {
+    el.overlayLegend.replaceChildren();
+    if (!entries.length) {
+      const hint = document.createElement('div');
+      hint.className = 'hint';
+      hint.textContent = 'Nincs bekapcsolt overlay';
+      el.overlayLegend.appendChild(hint);
+      return;
+    }
+    for (const entry of entries) {
+      const block = document.createElement('div');
+      block.className = 'legend-block';
+      const title = document.createElement('h3');
+      title.textContent = entry.label || entry.id;
+      block.appendChild(title);
+
+      const groups = entry.groups || [];
+      const itemCount = groups.reduce((n, g) => n + (g.items || []).length, 0);
+      const scroll = document.createElement('div');
+      scroll.className = 'legend-scroll';
+
+      if (itemCount > 12) {
+        const search = document.createElement('input');
+        search.type = 'search';
+        search.className = 'legend-search';
+        search.placeholder = 'Keresés a jelmagyarázatban';
+        search.addEventListener('input', () => {
+          const q = search.value.trim().toLowerCase();
+          scroll.querySelectorAll('.leg-item').forEach((row) => {
+            row.hidden = q && !row.textContent.toLowerCase().includes(q);
+          });
+        });
+        block.appendChild(search);
+      }
+
+      if (!itemCount) {
+        const empty = document.createElement('div');
+        empty.className = 'hint';
+        empty.textContent = entry.error || 'Nincs jelkulcs ehhez a réteghez.';
+        scroll.appendChild(empty);
+      }
+
+      for (const group of groups) {
+        if (groups.length > 1) {
+          const name = document.createElement('div');
+          name.className = 'legend-group-name';
+          name.textContent = group.layerName;
+          scroll.appendChild(name);
+        }
+        for (const item of group.items || []) {
+          const row = document.createElement('div');
+          row.className = 'leg-item';
+          const img = document.createElement('img');
+          img.src = item.image;
+          img.alt = '';
+          const text = document.createElement('span');
+          text.textContent = item.label;
+          row.append(img, text);
+          scroll.appendChild(row);
+        }
+      }
+      block.appendChild(scroll);
+      el.overlayLegend.appendChild(block);
+    }
+  }
+
+  async function refreshLegends(ids) {
+    const token = ++legendToken;
+    if (!ids.length) {
+      renderLegendDom([]);
+      return;
+    }
+    renderLegendDom(
+      ids.map((id) => legendByOverlay[id] || {
+        id,
+        label: catalog?.overlays?.find((o) => o.id === id)?.label || id,
+        groups: [],
+        error: 'Jelmagyarázat betöltése…',
+      })
+    );
+    await Promise.all(
+      ids.map(async (id) => {
+        if (legendByOverlay[id]?.groups?.length) return;
+        try {
+          const res = await fetch(`/api/overlay/${encodeURIComponent(id)}/legend`);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'jelmagyarázat hiba');
+          legendByOverlay[id] = data;
+        } catch (err) {
+          legendByOverlay[id] = {
+            id,
+            label: catalog?.overlays?.find((o) => o.id === id)?.label || id,
+            groups: [],
+            error: err.message,
+          };
+        }
+      })
+    );
+    if (token !== legendToken) return;
+    renderLegendDom(ids.map((id) => legendByOverlay[id]).filter(Boolean));
+  }
+
   function syncOverlays() {
     const opacity = Number(el.overlayOpacity.value) / 100;
     el.overlayOpacityVal.textContent = `${el.overlayOpacity.value}%`;
-    const checked = new Set(
-      [...el.overlayToggles.querySelectorAll('input:checked')].map((i) => i.value)
-    );
-    const legends = [];
+    const checked = new Set(checkedOverlayIds());
     for (const [id, ctrl] of Object.entries(exportLayers)) {
       if (checked.has(id)) {
         ctrl.enable();
         ctrl.setOpacity(opacity);
-        const meta = catalog?.overlays?.find((o) => o.id === id);
-        if (meta?.legend?.length) {
-          legends.push(
-            `<div><b>${meta.label}</b></div>` +
-              meta.legend
-                .map(
-                  (l) =>
-                    `<div class="leg-item"><span class="dot" style="background:${l.color}"></span>${l.label}</div>`
-                )
-                .join('')
-          );
-        } else if (meta) {
-          legends.push(`<div class="leg-item">• ${meta.label}</div>`);
-        }
       } else {
         ctrl.disable();
       }
     }
-    el.overlayLegend.innerHTML = legends.join('') || '<div class="hint">Nincs bekapcsolt overlay</div>';
+    refreshLegends([...checked]);
     syncUrl();
   }
 
@@ -1112,7 +1204,17 @@
       setStatus(err.message, 'error');
     }
   });
-  el.togglePanel.addEventListener('click', () => el.panel.classList.toggle('open'));
+  function setPanelOpen(open) {
+    el.panel.classList.toggle('open', open);
+    el.togglePanel.setAttribute('aria-expanded', open ? 'true' : 'false');
+    el.togglePanel.textContent = open ? '×' : '☰';
+    el.togglePanel.setAttribute('aria-label', open ? 'Panel bezárása' : 'Panel');
+  }
+
+  el.togglePanel.addEventListener('click', () => {
+    setPanelOpen(!el.panel.classList.contains('open'));
+  });
+  el.closePanel.addEventListener('click', () => setPanelOpen(false));
   map.on('moveend', scheduleLoad);
 
   (async function init() {

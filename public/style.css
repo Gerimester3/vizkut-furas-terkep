@@ -54,12 +54,37 @@ body {
   gap: 1rem;
 }
 
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.panel-header-text {
+  min-width: 0;
+  flex: 1;
+}
+
 .panel-header h1 {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 650;
   letter-spacing: -0.02em;
   line-height: 1.3;
+}
+
+.close-panel {
+  display: none;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: #0d121a;
+  color: var(--text);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .subtitle {
@@ -605,6 +630,59 @@ body {
   margin-top: 0.5rem;
   font-size: 0.78rem;
   color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.legend-block {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #0d121a;
+  padding: 0.45rem 0.5rem 0.55rem;
+}
+
+.legend-block h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.legend-search {
+  width: 100%;
+  margin-bottom: 0.35rem;
+  font: inherit;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: #161d27;
+  color: var(--text);
+  padding: 0.35rem 0.45rem;
+}
+
+.legend-scroll {
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.legend-group-name {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.leg-item img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  background: #fff;
+  border-radius: 2px;
 }
 
 .overlay-legend .leg-item {
@@ -706,7 +784,7 @@ body {
   .panel {
     position: absolute;
     z-index: 1100;
-    width: min(100%, 360px);
+    width: min(calc(100% - 64px), 360px);
     height: 100%;
     transform: translateX(-105%);
     transition: transform 0.2s ease;
@@ -716,8 +794,28 @@ body {
     transform: translateX(0);
   }
 
+  .panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #1a2330;
+    margin: -1rem -1rem 0;
+    padding: 0.75rem 0.75rem 0.65rem 1rem;
+  }
+
+  .close-panel {
+    display: grid;
+    place-items: center;
+  }
+
   .toggle-panel {
     display: block;
+  }
+
+  .map-toolbar {
+    z-index: 1200;
+    left: auto;
+    right: 12px;
   }
 
   .btn-row {
