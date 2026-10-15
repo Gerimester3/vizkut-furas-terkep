@@ -762,6 +762,88 @@
     return `kut-vegleges-tervrajz-${safe || 'kut'}.pdf`;
   }
 
+  function planText(value) {
+    if (value == null) return '';
+    return String(value).trim();
+  }
+
+  function toPlan(state) {
+    const source = state || {};
+    const sections = Array.isArray(source.sections) ? source.sections : [];
+    return {
+      format: 'vizkut-tervrajz',
+      version: 1,
+      name: planText(source.name).slice(0, 80),
+      place: planText(source.place).slice(0, 80),
+      date: planText(source.date),
+      ground: planText(source.ground),
+      water: planText(source.water),
+      note: planText(source.note).slice(0, 180),
+      depth: planText(source.depth),
+      bore: planText(source.bore),
+      casingOn: !!source.casingOn,
+      casingDia: planText(source.casingDia),
+      casingDepth: planText(source.casingDepth),
+      sections: sections.map((section) => ({
+        type: section && section.type === 'szuro' ? 'szuro' : 'teli',
+        length: planText(section && section.length),
+        diameter: planText(section && section.diameter),
+      })),
+    };
+  }
+
+  function planFileName(plan) {
+    const raw = (plan && plan.name ? plan.name : 'kut').trim() || 'kut';
+    const safe = raw.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '').replace(/\s+/g, ' ').slice(0, 80);
+    return `kut-terv-${safe || 'kut'}.json`;
+  }
+
+  function fromPlan(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('A fájl nem egy kútterv.');
+    }
+    if (data.format && data.format !== 'vizkut-tervrajz') {
+      throw new Error('Ez a fájl nem kútterv.');
+    }
+    if (data.version != null && Number(data.version) !== 1) {
+      throw new Error('Ezt a tervfájlt ez a program nem ismeri.');
+    }
+    if (!Array.isArray(data.sections)) {
+      throw new Error('A tervből hiányoznak a béléscső-szakaszok.');
+    }
+    if (data.sections.length > 40) {
+      throw new Error('A tervben túl sok szakasz van.');
+    }
+    const sections = data.sections.map((section) => {
+      const rawType = planText(section && section.type).toLowerCase();
+      const type = rawType === 'szuro' || rawType === 'szűrő' || rawType === 'szűrőcső' || rawType === 'szurocso'
+        ? 'szuro'
+        : 'teli';
+      return {
+        type,
+        length: planText(section && section.length),
+        diameter: planText(section && section.diameter),
+      };
+    });
+    if (!sections.length) sections.push({ type: 'teli', length: '', diameter: '' });
+    const date = planText(data.date);
+    return {
+      name: planText(data.name).slice(0, 80),
+      place: planText(data.place).slice(0, 80),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '',
+      ground: planText(data.ground),
+      water: planText(data.water),
+      note: planText(data.note).slice(0, 180),
+      depth: planText(data.depth),
+      bore: planText(data.bore),
+      casingOn: data.casingOn === true || data.casingOn === 'true' || data.casingOn === 1,
+      casingDia: planText(data.casingDia),
+      casingDepth: planText(data.casingDepth),
+      sections,
+      pristineSample: false,
+    };
+  }
+
   async function renderPdf(commands, opts) {
     const { PDFDocument, rgb } = opts.PDFLib;
     const doc = await PDFDocument.create();
@@ -840,6 +922,9 @@
     renderPdf,
     placeholderSvg,
     fileNameFor,
+    toPlan,
+    fromPlan,
+    planFileName,
     fmtDepth,
     fmtMm,
   };

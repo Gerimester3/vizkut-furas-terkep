@@ -105,6 +105,12 @@
         <div class="actions">
           <button type="submit" id="pdfBtn" class="btn primary">PDF letöltése</button>
           <div class="action-row">
+            <button type="button" id="savePlanBtn" class="btn secondary">Terv mentése</button>
+            <button type="button" id="loadPlanBtn" class="btn secondary">Terv betöltése</button>
+          </div>
+          <input id="planFile" type="file" accept="application/json,.json" hidden />
+          <p class="hint">A mentett tervfájlt később be lehet tölteni, és azon módosítani. Nem kell újra begépelni.</p>
+          <div class="action-row">
             <button type="button" id="sampleBtn" class="btn secondary">Minta</button>
             <button type="button" id="clearBtn" class="btn secondary">Üres űrlap</button>
           </div>

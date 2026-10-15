@@ -369,6 +369,45 @@
     fillForm();
   });
 
+  document.getElementById('savePlanBtn').addEventListener('click', () => {
+    const plan = KutTerv.toPlan(state);
+    const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = KutTerv.planFileName(plan);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    statusEl.textContent = 'A tervfájl mentve. Később a Terv betöltése gombbal vissza lehet hozni.';
+  });
+
+  const planFile = document.getElementById('planFile');
+  document.getElementById('loadPlanBtn').addEventListener('click', () => {
+    planFile.click();
+  });
+  planFile.addEventListener('change', async () => {
+    const file = planFile.files && planFile.files[0];
+    planFile.value = '';
+    if (!file) return;
+    try {
+      let data;
+      try {
+        data = JSON.parse(await file.text());
+      } catch (err) {
+        throw new Error('A fájl nem olvasható terv. A Terv mentése gombbal készült JSON fájlt válaszd.');
+      }
+      state = KutTerv.fromPlan(data);
+      triedExport = false;
+      persist();
+      fillForm();
+      statusEl.textContent = 'A terv betöltve. Módosíthatod, aztán mentsd újra a fájlt vagy töltsd le a PDF-et.';
+    } catch (err) {
+      statusEl.textContent = err && err.message ? err.message : 'A tervfájl nem tölthető be.';
+    }
+  });
+
   fillForm();
   loadFonts().catch(() => {});
 })();
