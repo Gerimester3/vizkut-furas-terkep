@@ -329,17 +329,6 @@
     return nice * pow;
   }
 
-  function niceBarMeters(mmPerM, maxMm) {
-    const maxM = maxMm / mmPerM;
-    const pow = Math.pow(10, Math.floor(Math.log10(Math.max(maxM, 1e-9))));
-    for (const factor of [5, 2, 1, 0.5, 0.2, 0.1]) {
-      const meters = factor * pow;
-      const width = meters * mmPerM;
-      if (meters <= maxM + 1e-9 && width >= 10) return meters;
-    }
-    return 0.1 * pow;
-  }
-
   function visualOuters(model) {
     const casing = model.casing;
     const stepped = !!model.stepped;
@@ -722,18 +711,6 @@
         ty += lineH;
       });
     });
-
-    const barMeters = niceBarMeters(mmPerM, upperBore * 2);
-    const barW = barMeters * mmPerM;
-    const barX = CENTER_X - upperBore;
-    const barY = 257.5;
-    const barLabel = Math.abs(barMeters - Math.round(barMeters)) < 1e-6
-      ? `${Math.round(barMeters)} m`
-      : `${fmtNum(barMeters, 1)} m`;
-    text(barX + barW / 2, barY - 2.6, barLabel, 7, MUTED, 'middle', false);
-    line(barX, barY, barX + barW, barY, INK, 0.4);
-    line(barX, barY - 1.1, barX, barY + 1.1, INK, 0.4);
-    line(barX + barW, barY - 1.1, barX + barW, barY + 1.1, INK, 0.4);
 
     line(SPLIT_X, 38, SPLIT_X, FOOT_Y - 1, RULE, 0.35);
 
