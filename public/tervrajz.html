@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kút végleges tervrajza</title>
+    <link rel="stylesheet" href="/tervrajz.css" />
+  </head>
+  <body>
+    <div class="app">
+      <form class="panel" id="form" novalidate>
+        <header class="panel-head">
+          <a class="back" href="/">← Fúrási térkép</a>
+          <h1>Kút végleges tervrajza</h1>
+          <p class="lead">
+            A rajz a talajszinttől lefelé készül, egy A4-es oldalra. A fúrat
+            átmérője végig állandó. A kútbeléscsövet szakaszonként adod meg:
+            típus, egybefüggő hossz és átmérő. A szűrő a vízadó réteghez kerül.
+          </p>
+        </header>
+
+        <p class="banner" id="sampleBanner" hidden>
+          Mintaadatok, hogy lásd a rajz felépítését. Írd át a saját kútodra.
+        </p>
+
+        <section class="block">
+          <h2>Kút adatai</h2>
+          <label>
+            Megnevezés
+            <input id="name" type="text" maxlength="80" autocomplete="off" />
+          </label>
+          <label>
+            Helyszín
+            <input id="place" type="text" maxlength="80" autocomplete="off" />
+          </label>
+          <div class="split">
+            <label>
+              Dátum
+              <input id="date" type="date" />
+            </label>
+            <label>
+              Terepszint (mBf)
+              <input id="ground" type="number" step="any" inputmode="decimal" />
+            </label>
+          </div>
+          <label>
+            Nyugalmi vízszint (m a talajszinttől)
+            <input id="water" type="number" min="0" step="any" inputmode="decimal" />
+          </label>
+          <label>
+            Megjegyzés
+            <input id="note" type="text" maxlength="180" autocomplete="off" />
+          </label>
+        </section>
+
+        <section class="block">
+          <h2>Fúrat</h2>
+          <p class="hint">Az átmérő a talajszinttől a talpig ugyanakkora. Mélység méterben, átmérő milliméterben.</p>
+          <div class="split">
+            <label>
+              Talpmélység (m)
+              <input id="depth" type="number" min="0" step="any" inputmode="decimal" />
+            </label>
+            <label>
+              Fúrat átmérője (mm)
+              <input id="bore" type="number" min="0" step="any" inputmode="decimal" />
+            </label>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2>Acél védőcső</h2>
+          <label class="check">
+            <input id="casingOn" type="checkbox" />
+            Beépül acél védőcső
+          </label>
+          <div id="casingFields" class="casing-fields" hidden>
+            <p class="hint">A védőcső a talajszinttől a megadott mélységig tart. A kútbeléscső ezen belül megy.</p>
+            <div class="split">
+              <label>
+                Átmérő (mm)
+                <input id="casingDia" type="number" min="0" step="any" inputmode="decimal" />
+              </label>
+              <label>
+                Lehelyezési mélység (m)
+                <input id="casingDepth" type="number" min="0" step="any" inputmode="decimal" />
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2>Kútbeléscső</h2>
+          <p class="hint">
+            Felülről lefelé, a talajszinttől. Egy sor egybefüggő cső: ugyanaz a típus és ugyanaz az átmérő.
+            A szűrőcső oda kerül, ahol a vízadó van.
+          </p>
+          <div id="sections" class="sections"></div>
+          <button type="button" id="addSection" class="btn secondary">Szakasz hozzáadása</button>
+          <p class="summary" id="summary"></p>
+        </section>
+
+        <div id="issues" class="issues" role="status"></div>
+
+        <div class="actions">
+          <button type="submit" id="pdfBtn" class="btn primary">PDF letöltése</button>
+          <div class="action-row">
+            <button type="button" id="sampleBtn" class="btn secondary">Minta</button>
+            <button type="button" id="clearBtn" class="btn secondary">Üres űrlap</button>
+          </div>
+          <p class="status" id="status" role="status"></p>
+        </div>
+      </form>
+
+      <main class="stage">
+        <div class="stage-bar">
+          <span>A4 előnézet · egy oldal</span>
+        </div>
+        <div class="sheet-wrap">
+          <div class="sheet-frame" id="sheet"></div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/vendor/pdf-lib.min.js"></script>
+    <script src="/vendor/fontkit.umd.min.js"></script>
+    <script src="/tervrajz-draw.js"></script>
+    <script src="/tervrajz.js"></script>
+  </body>
+</html>
