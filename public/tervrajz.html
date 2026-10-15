@@ -13,9 +13,9 @@
           <a class="back" href="/">← Fúrási térkép</a>
           <h1>Kút végleges tervrajza</h1>
           <p class="lead">
-            A rajz a talajszinttől lefelé készül, egy A4-es oldalra. A fúrat
-            átmérője végig állandó. A kútbeléscsövet szakaszonként adod meg:
-            típus, egybefüggő hossz és átmérő. A szűrő a vízadó réteghez kerül.
+            A rajz a talajszinttől lefelé készül, egy A4-es oldalra. A kútbeléscsövet
+            szakaszonként adod meg. A védőcső az omló réteget zárja ki, alatta a
+            fúrat szűkülhet. A kavics a talptól felfelé, a fúrat és a béléscső között van.
           </p>
         </header>
 
@@ -55,7 +55,10 @@
 
         <section class="block">
           <h2>Fúrat</h2>
-          <p class="hint">Az átmérő a talajszinttől a talpig ugyanakkora. Mélység méterben, átmérő milliméterben.</p>
+          <p class="hint">
+            Ez a folytatódó fúrat átmérője, a védőcső alatt. Ha a védőcső ennél tágabb,
+            a lyuk a sarunál szűkül. Mélység méterben, átmérő milliméterben.
+          </p>
           <div class="split">
             <label>
               Talpmélység (m)
@@ -75,7 +78,10 @@
             Beépül acél védőcső
           </label>
           <div id="casingFields" class="casing-fields" hidden>
-            <p class="hint">A védőcső a talajszinttől a megadott mélységig tart. A kútbeléscső ezen belül megy.</p>
+            <p class="hint">
+              A védőcső a talajszinttől a megadott mélységig tart, és lehet tágabb a
+              folytatódó fúratnál: csak az omló réteget zárja ki.
+            </p>
             <div class="split">
               <label>
                 Átmérő (mm)
@@ -87,6 +93,18 @@
               </label>
             </div>
           </div>
+        </section>
+
+        <section class="block">
+          <h2>Kavicsozás</h2>
+          <p class="hint">
+            A kavics a fúrat és a kútbeléscső között van. A talptól felfelé töltik.
+            Add meg, hány méterig ér fel a talajszinttől. Üresen nincs kavics.
+          </p>
+          <label>
+            Teteje a talajszinttől (m)
+            <input id="gravelTop" type="number" min="0" step="any" inputmode="decimal" />
+          </label>
         </section>
 
         <section class="block">

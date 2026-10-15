@@ -10,7 +10,7 @@
   const statusEl = document.getElementById('status');
   const sampleBanner = document.getElementById('sampleBanner');
 
-  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingDia', 'casingDepth'];
+  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingDia', 'casingDepth', 'gravelTop'];
   let triedExport = false;
   let fontPromise = null;
 
@@ -33,6 +33,7 @@
       casingOn: false,
       casingDia: '',
       casingDepth: '',
+      gravelTop: '',
       sections: [{ type: 'teli', length: '', diameter: '' }],
       pristineSample: false,
     };
@@ -47,12 +48,13 @@
       water: '6.5',
       note: '',
       depth: '42',
-      bore: '320',
+      bore: '150',
       casingOn: true,
       casingDia: '244',
-      casingDepth: '10',
+      casingDepth: '12',
+      gravelTop: '18',
       sections: [
-        { type: 'teli', length: '8', diameter: '165' },
+        { type: 'teli', length: '8', diameter: '180' },
         { type: 'teli', length: '12', diameter: '125' },
         { type: 'szuro', length: '18', diameter: '125' },
         { type: 'teli', length: '4', diameter: '125' },
