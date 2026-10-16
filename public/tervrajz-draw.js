@@ -22,8 +22,8 @@
   const FOOT_Y = 266;
   const MAX_SECTIONS = 40;
 
-  const INK = '#1c1917';
-  const MUTED = '#57534e';
+  const INK = '#000000';
+  const MUTED = '#000000';
   const RULE = '#d6d3d1';
   const BORE_FILL = '#f3efe4';
   const BORE_LINE = '#44403c';
@@ -692,7 +692,7 @@
       callouts.push({
         anchorY: (yAt(0) + yAt(model.casing.depth)) / 2,
         lines: [casingName, `Ø ${fmtMm(model.casing.diameter)} mm`],
-        color: casingColor,
+        color: plastic ? casingColor : '#000000',
       });
     }
     model.sections.forEach((section) => {
@@ -713,21 +713,21 @@
       callouts.push({
         anchorY: (yAt(model.casing.depth) + yAt(model.depth)) / 2,
         lines: ['Fúrat szűkül', `Ø ${fmtMm(model.boreMm)} mm`],
-        color: BORE_LINE,
+        color: '#000000',
       });
     }
     if (model.gravelShown != null) {
       callouts.push({
         anchorY: (yAt(model.gravelShown) + yAt(model.depth)) / 2,
         lines: ['Kavics', `${fmtDepth(model.gravelShown)} m-től a talpig`],
-        color: '#57534e',
+        color: '#000000',
       });
     }
     if (model.cementDepth != null) {
       callouts.push({
         anchorY: (yAt(0) + yAt(model.cementDepth)) / 2,
         lines: ['Cement', `0–${fmtDepth(model.cementDepth)} m`],
-        color: '#52525b',
+        color: '#000000',
       });
     }
     const calloutWidth = SPLIT_X - CALLOUT_X - 2.5;
