@@ -10,7 +10,7 @@
   const statusEl = document.getElementById('status');
   const sampleBanner = document.getElementById('sampleBanner');
 
-  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingDia', 'casingDepth', 'gravelTop'];
+  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'gravelTop'];
   let triedExport = false;
   let fontPromise = null;
 
@@ -31,6 +31,7 @@
       depth: '',
       bore: '',
       casingOn: false,
+      casingMaterial: 'acel',
       casingDia: '',
       casingDepth: '',
       gravelTop: '',
@@ -50,6 +51,7 @@
       depth: '42',
       bore: '150',
       casingOn: true,
+      casingMaterial: 'acel',
       casingDia: '244',
       casingDepth: '12',
       gravelTop: '18',
@@ -71,6 +73,7 @@
       if (!raw) return sampleState();
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.sections) || !data.sections.length) return sampleState();
+      if (data.casingMaterial !== 'muanyag') data.casingMaterial = 'acel';
       return data;
     } catch (err) {
       return sampleState();

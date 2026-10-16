@@ -72,17 +72,25 @@
         </section>
 
         <section class="block">
-          <h2>Acél védőcső</h2>
+          <h2>Védőcső</h2>
           <label class="check">
             <input id="casingOn" type="checkbox" />
-            Beépül acél védőcső
+            Beépül védőcső
           </label>
           <div id="casingFields" class="casing-fields" hidden>
             <p class="hint">
               A védőcső a talajszinttől a megadott mélységig tart, és lehet tágabb a
               folytatódó fúratnál: csak az omló réteget zárja ki. Ha az átmérője
-              megegyezik a fúrattal, a rajz a külső vonalat vastagítja.
+              megegyezik a fúrattal, a rajz a külső vonalat vastagítja. Az acél
+              sötétszürke, a műanyag (PVC) kék.
             </p>
+            <label>
+              Anyag
+              <select id="casingMaterial">
+                <option value="acel">Acél</option>
+                <option value="muanyag">Műanyag (PVC)</option>
+              </select>
+            </label>
             <div class="split">
               <label>
                 Átmérő (mm)

@@ -193,7 +193,8 @@
         err('casingDepth', 'A védőcső nem érhet a talp alá.');
       }
       if (!errors.some((e) => e.field === 'casingDia' || e.field === 'casingDepth') && casingDia != null && casingDepth != null) {
-        casing = { diameter: casingDia, depth: casingDepth };
+        const material = input.casingMaterial === 'muanyag' ? 'muanyag' : 'acel';
+        casing = { diameter: casingDia, depth: casingDepth, material };
       }
     }
 
@@ -400,6 +401,10 @@
     const yAt = (depth) => GROUND_Y + (depth / model.depth) * drawH;
     const mmPerM = drawH / model.depth;
     const { linerOuters, caseOuter, upperBore, lowerBore, stepped, flush } = visualOuters(model);
+    const plastic = !!(model.casing && model.casing.material === 'muanyag');
+    const casingColor = plastic ? '#1d4ed8' : CASING;
+    const casingShoe = plastic ? '#1e3a8a' : '#27272a';
+    const casingName = plastic ? 'Műanyag védőcső' : 'Acél védőcső';
     const linerWall = 0.62;
     const caseWall = 1.25;
     const cellW = (FRAME_R - FRAME_L) / 3;
@@ -538,15 +543,15 @@
       const shoe = Math.min(1.7, Math.max(0.4, y1 - y0));
       if (flush) {
         const thick = 2.2;
-        line(CENTER_X - upperBore, y0, CENTER_X - upperBore, y1, CASING, thick);
-        line(CENTER_X + upperBore, y0, CENTER_X + upperBore, y1, CASING, thick);
-        rect(CENTER_X - upperBore - thick / 2, y1 - shoe, thick, shoe, '#27272a', null, 0);
-        rect(CENTER_X + upperBore - thick / 2, y1 - shoe, thick, shoe, '#27272a', null, 0);
+        line(CENTER_X - upperBore, y0, CENTER_X - upperBore, y1, casingColor, thick);
+        line(CENTER_X + upperBore, y0, CENTER_X + upperBore, y1, casingColor, thick);
+        rect(CENTER_X - upperBore - thick / 2, y1 - shoe, thick, shoe, casingShoe, null, 0);
+        rect(CENTER_X + upperBore - thick / 2, y1 - shoe, thick, shoe, casingShoe, null, 0);
       } else {
-        rect(CENTER_X - caseOuter, y0, caseWall, y1 - y0, CASING, null, 0);
-        rect(CENTER_X + caseOuter - caseWall, y0, caseWall, y1 - y0, CASING, null, 0);
-        rect(CENTER_X - caseOuter - 0.25, y1 - shoe, caseWall + 0.5, shoe, '#27272a', null, 0);
-        rect(CENTER_X + caseOuter - caseWall - 0.25, y1 - shoe, caseWall + 0.5, shoe, '#27272a', null, 0);
+        rect(CENTER_X - caseOuter, y0, caseWall, y1 - y0, casingColor, null, 0);
+        rect(CENTER_X + caseOuter - caseWall, y0, caseWall, y1 - y0, casingColor, null, 0);
+        rect(CENTER_X - caseOuter - 0.25, y1 - shoe, caseWall + 0.5, shoe, casingShoe, null, 0);
+        rect(CENTER_X + caseOuter - caseWall - 0.25, y1 - shoe, caseWall + 0.5, shoe, casingShoe, null, 0);
       }
     }
 
@@ -644,8 +649,8 @@
     if (model.casing) {
       callouts.push({
         anchorY: (yAt(0) + yAt(model.casing.depth)) / 2,
-        lines: ['Acél védőcső', `Ø ${fmtMm(model.casing.diameter)} mm`],
-        color: CASING,
+        lines: [casingName, `Ø ${fmtMm(model.casing.diameter)} mm`],
+        color: casingColor,
       });
     }
     model.sections.forEach((section) => {
@@ -717,7 +722,7 @@
     let ty = 40;
     const legend = [
       [BORE_FILL, BORE_LINE, 'Fúrat'],
-      [CASING, CASING, 'Védőcső'],
+      [casingColor, casingColor, plastic ? 'Műanyag' : 'Acél'],
       [BLANK_FILL, BLANK_LINE, 'Teli'],
       [SCREEN_FILL, SCREEN_LINE, 'Szűrő'],
     ];
@@ -760,7 +765,7 @@
     if (model.waterM != null) kv('Nyugalmi vízszint', `${fmtDepth(model.waterM)} m`);
     ty += 1.6;
 
-    heading('Acél védőcső');
+    heading(model.casing ? casingName : 'Védőcső');
     if (!model.casing) kv('Beépítés', 'nincs');
     else {
       kv('Átmérő', `${fmtMm(model.casing.diameter)} mm`);
@@ -885,6 +890,12 @@
     return String(value).trim();
   }
 
+  function casingMaterialOf(value) {
+    const raw = planText(value).toLowerCase();
+    if (raw === 'muanyag' || raw === 'műanyag' || raw === 'pvc' || raw === 'műanyag (pvc)') return 'muanyag';
+    return 'acel';
+  }
+
   function toPlan(state) {
     const source = state || {};
     const sections = Array.isArray(source.sections) ? source.sections : [];
@@ -900,6 +911,7 @@
       depth: planText(source.depth),
       bore: planText(source.bore),
       casingOn: !!source.casingOn,
+      casingMaterial: source.casingMaterial === 'muanyag' ? 'muanyag' : 'acel',
       casingDia: planText(source.casingDia),
       casingDepth: planText(source.casingDepth),
       gravelTop: planText(source.gravelTop),
@@ -956,6 +968,7 @@
       depth: planText(data.depth),
       bore: planText(data.bore),
       casingOn: data.casingOn === true || data.casingOn === 'true' || data.casingOn === 1,
+      casingMaterial: casingMaterialOf(data.casingMaterial),
       casingDia: planText(data.casingDia),
       casingDepth: planText(data.casingDepth),
       gravelTop: planText(data.gravelTop),
