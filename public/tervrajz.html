@@ -15,7 +15,7 @@
           <p class="lead">
             A rajz a talajszinttől lefelé készül, egy A4-es oldalra. A kútbeléscsövet
             szakaszonként adod meg. A védőcső az omló réteget zárja ki, alatta a
-            fúrat szűkülhet. A kavics a talptól felfelé, a fúrat és a béléscső között van.
+            fúrat szűkülhet. A gyűrűstérben a kavics a talptól felfelé van, a cement a felszíntől lefelé.
           </p>
         </header>
 
@@ -105,15 +105,26 @@
         </section>
 
         <section class="block">
-          <h2>Kavicsozás</h2>
+          <h2>Gyűrűstér</h2>
           <p class="hint">
-            A kavics a fúrat és a kútbeléscső között van. A talptól felfelé töltik.
-            Add meg, hány méterig ér fel a talajszinttől. Üresen nincs kavics.
+            A kavics a fúrat és a kútbeléscső között van, a talptól felfelé. Add meg, hány
+            méterig ér fel a talajszinttől. Üresen nincs kavics. A cementezés a felszíntől
+            tart lefelé. Ahol a kettő fedi egymást, a cement takarja a kavicsot.
           </p>
           <label>
-            Teteje a talajszinttől (m)
+            Kavics teteje a talajszinttől (m)
             <input id="gravelTop" type="number" min="0" step="any" inputmode="decimal" />
           </label>
+          <label class="check">
+            <input id="cementOn" type="checkbox" />
+            Cementezve is
+          </label>
+          <div id="cementFields" class="cement-fields" hidden>
+            <label>
+              A felszíntől eddig (m)
+              <input id="cementDepth" type="number" min="0" step="any" inputmode="decimal" />
+            </label>
+          </div>
         </section>
 
         <section class="block">

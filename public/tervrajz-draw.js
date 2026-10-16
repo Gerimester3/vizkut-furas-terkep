@@ -35,6 +35,7 @@
   const SCREEN_LINE = '#075985';
   const SLOT = '#0c4a6e';
   const WATER = '#0369a1';
+  const CEMENT = '#b4b4ae';
   const LEADER = '#a8a29e';
   const GRID = '#e7e5e4';
   const WARN = '#9a3412';
@@ -166,10 +167,20 @@
 
     if (ground != null && Number.isNaN(ground)) err('ground', 'A terepszint legyen szám.');
     const gravel = parseNum(input.gravelTop);
-    if (gravel != null && Number.isNaN(gravel)) err('gravelTop', 'A kavicsolás teteje legyen szám.');
-    else if (gravel != null && gravel < 0) err('gravelTop', 'A kavicsolás teteje ne legyen negatív.');
+    if (gravel != null && Number.isNaN(gravel)) err('gravelTop', 'A kavics teteje legyen szám.');
+    else if (gravel != null && gravel < 0) err('gravelTop', 'A kavics teteje ne legyen negatív.');
     else if (gravel != null && depth != null && !Number.isNaN(depth) && depth > 0 && gravel >= depth) {
       err('gravelTop', 'A kavics a talp fölé érjen fel, mert a talptól felfelé töltik.');
+    }
+
+    let cement = null;
+    if (input.cementOn) {
+      const cementDepth = parseNum(input.cementDepth);
+      if (cementDepth == null) err('cementDepth', 'Add meg, milyen mélységig van cementezve a gyűrűstér.');
+      else if (Number.isNaN(cementDepth) || cementDepth <= 0) err('cementDepth', 'A cementezés mélysége legyen 0-nál nagyobb.');
+      else if (depth != null && !Number.isNaN(depth) && depth > 0 && cementDepth > depth + 0.001) {
+        err('cementDepth', 'A cementezés nem érhet a talp alá.');
+      } else if (!Number.isNaN(cementDepth)) cement = cementDepth;
     }
 
     if (water != null && Number.isNaN(water)) err('water', 'A nyugalmi vízszint legyen szám.');
@@ -271,8 +282,17 @@
     if (flush) {
       notes.push('A védőcső és a fúrat azonos átmérőjű, vastag külső vonal jelöli.');
     }
+    const gravelShown = gravel != null && !Number.isNaN(gravel)
+      ? (cement != null ? Math.max(gravel, cement) : gravel)
+      : null;
     if (gravel != null && !Number.isNaN(gravel)) {
-      notes.push(`Kavicsozás ${fmtDepth(gravel)} m-től a talpig, a fúrat és a béléscső között.`);
+      notes.push(`Kavics a gyűrűstérben ${fmtDepth(gravel)} m-től a talpig.`);
+    }
+    if (cement != null) {
+      notes.push(`Cementezés a felszíntől ${fmtDepth(cement)} m-ig.`);
+    }
+    if (gravel != null && !Number.isNaN(gravel) && cement != null && cement > gravel + 0.001) {
+      notes.push(`Ahol fedik egymást, a cement takarja a kavicsot ${fmtDepth(gravel)}–${fmtDepth(Math.min(cement, depth))} m között.`);
     }
 
     for (let i = 1; i < built.length; i += 1) {
@@ -310,6 +330,8 @@
         groundMbf: ground,
         waterM: water,
         gravelTop: gravel != null && !Number.isNaN(gravel) ? gravel : null,
+        gravelShown: gravelShown != null && gravelShown < depth - 0.02 ? gravelShown : null,
+        cementDepth: cement,
         stepped,
         flush,
         casing,
@@ -347,7 +369,9 @@
     let linerOuters = model.sections.map((section) => {
       const raw = (section.diameter / refDia) * (stepped ? caseOuter : upperBore);
       const inWideHole = stepped && section.bottom <= casing.depth + 0.001;
-      const packed = model.gravelTop != null && section.bottom > model.gravelTop + 0.001;
+      const inGravel = model.gravelShown != null && section.bottom > model.gravelShown + 0.001;
+      const inCement = model.cementDepth != null && section.top < model.cementDepth - 0.001;
+      const packed = inGravel || inCement;
       const wallGap = packed ? 3.4 : inWideHole ? 1.25 : 0.8;
       const wall = inWideHole && caseOuter != null ? caseOuter : lowerBore;
       const limit = wall - wallGap;
@@ -455,20 +479,19 @@
       rect(CENTER_X - inner, y0, inner * 2, y1 - y0, ANNULUS, null, 0);
     }
 
-    if (model.gravelTop != null) {
-      const gravelCuts = [model.gravelTop];
+    const drawAnnulus = (fromDepth, toDepth, paint) => {
+      if (!(toDepth > fromDepth + 0.02)) return;
+      const cuts = [fromDepth];
       model.sections.forEach((section) => {
-        if (section.top > model.gravelTop && section.top < model.depth) gravelCuts.push(section.top);
-        if (section.bottom > model.gravelTop && section.bottom < model.depth) gravelCuts.push(section.bottom);
+        if (section.top > fromDepth && section.top < toDepth) cuts.push(section.top);
+        if (section.bottom > fromDepth && section.bottom < toDepth) cuts.push(section.bottom);
       });
-      if (model.casing && model.casing.depth > model.gravelTop && model.casing.depth < model.depth) {
-        gravelCuts.push(model.casing.depth);
-      }
-      gravelCuts.push(model.depth);
-      gravelCuts.sort((a, b) => a - b);
-      for (let i = 0; i < gravelCuts.length - 1; i += 1) {
-        const top = gravelCuts[i];
-        const bottom = gravelCuts[i + 1];
+      if (model.casing && model.casing.depth > fromDepth && model.casing.depth < toDepth) cuts.push(model.casing.depth);
+      cuts.push(toDepth);
+      cuts.sort((a, b) => a - b);
+      for (let i = 0; i < cuts.length - 1; i += 1) {
+        const top = cuts[i];
+        const bottom = cuts[i + 1];
         if (bottom - top < 0.02) continue;
         const mid = (top + bottom) / 2;
         const sectionIndex = model.sections.findIndex((section) => mid >= section.top - 0.001 && mid <= section.bottom + 0.001);
@@ -479,6 +502,11 @@
           ? (flush ? upperBore - 1.55 : caseOuter - caseWall - 0.35)
           : (stepped ? lowerBore : upperBore) - 0.25;
         if (outerHalf - innerHalf < 0.65) continue;
+        paint(top, bottom, innerHalf, outerHalf);
+      }
+    };
+    if (model.gravelShown != null) {
+      drawAnnulus(model.gravelShown, model.depth, (top, bottom, innerHalf, outerHalf) => {
         const y0 = yAt(top);
         const y1 = yAt(bottom);
         const band = outerHalf - innerHalf;
@@ -497,7 +525,18 @@
             }
           });
         }
-      }
+      });
+    }
+    if (model.cementDepth != null) {
+      drawAnnulus(0, Math.min(model.cementDepth, model.depth), (top, bottom, innerHalf, outerHalf) => {
+        const y0 = yAt(top);
+        const y1 = yAt(bottom);
+        const band = outerHalf - innerHalf;
+        [-1, 1].forEach((side) => {
+          const x = side < 0 ? CENTER_X - outerHalf : CENTER_X + innerHalf;
+          rect(x, y0, band, Math.max(0.2, y1 - y0), CEMENT, null, 0);
+        });
+      });
     }
 
     model.sections.forEach((section, index) => {
@@ -625,7 +664,10 @@
     if (model.casing && model.casing.depth < model.depth - 0.01) {
       ticks.push({ depth: model.casing.depth, priority: 2, kind: 'bound' });
     }
-    if (model.gravelTop != null) ticks.push({ depth: model.gravelTop, priority: 1, kind: 'bound' });
+    if (model.gravelShown != null) ticks.push({ depth: model.gravelShown, priority: 1, kind: 'bound' });
+    if (model.cementDepth != null && model.cementDepth < model.depth - 0.01) {
+      ticks.push({ depth: model.cementDepth, priority: 2, kind: 'bound' });
+    }
     if (model.waterM != null) ticks.push({ depth: model.waterM, priority: 2, kind: 'water' });
     ticks.sort((a, b) => a.depth - b.depth || b.priority - a.priority);
     const placedTicks = [];
@@ -674,11 +716,18 @@
         color: BORE_LINE,
       });
     }
-    if (model.gravelTop != null) {
+    if (model.gravelShown != null) {
       callouts.push({
-        anchorY: (yAt(model.gravelTop) + yAt(model.depth)) / 2,
-        lines: ['Kavics', `${fmtDepth(model.gravelTop)} m-től a talpig`],
+        anchorY: (yAt(model.gravelShown) + yAt(model.depth)) / 2,
+        lines: ['Kavics', `${fmtDepth(model.gravelShown)} m-től a talpig`],
         color: '#57534e',
+      });
+    }
+    if (model.cementDepth != null) {
+      callouts.push({
+        anchorY: (yAt(0) + yAt(model.cementDepth)) / 2,
+        lines: ['Cement', `0–${fmtDepth(model.cementDepth)} m`],
+        color: '#52525b',
       });
     }
     const calloutWidth = SPLIT_X - CALLOUT_X - 2.5;
@@ -726,7 +775,8 @@
       [BLANK_FILL, BLANK_LINE, 'Teli'],
       [SCREEN_FILL, SCREEN_LINE, 'Szűrő'],
     ];
-    if (model.gravelTop != null) legend.push(['#e7e5e4', '#78716c', 'Kavics']);
+    if (model.gravelShown != null) legend.push(['#e7e5e4', '#78716c', 'Kavics']);
+    if (model.cementDepth != null) legend.push([CEMENT, '#737373', 'Cement']);
     const legendW = (FRAME_R - TABLE_X - 4) / legend.length;
     legend.forEach((item, index) => {
       const x = TABLE_X + 2 + index * legendW;
@@ -735,7 +785,7 @@
     });
     ty += 8;
 
-    const metaRows = 2 + (model.stepped ? 1 : 0) + (model.gravelTop != null ? 1 : 0) + (model.groundMbf != null ? 1 : 0) + (model.waterM != null ? 1 : 0);
+    const metaRows = 2 + (model.stepped ? 1 : 0) + (model.gravelShown != null ? 1 : 0) + (model.cementDepth != null ? 1 : 0) + (model.groundMbf != null ? 1 : 0) + (model.waterM != null ? 1 : 0);
     const casingRows = model.casing ? 2 : 1;
     const filterRows = Math.max(1, model.filters.length);
     const bodyRows = metaRows + casingRows + 1 + model.sections.length + filterRows;
@@ -760,7 +810,8 @@
     kv('Talpmélység', `${fmtDepth(model.depth)} m`);
     kv(model.stepped ? 'Fúrat a védőcső alatt' : 'Fúrat Ø', `${fmtMm(model.boreMm)} mm`);
     if (model.stepped) kv('Fúrat a saruig', `Ø ${fmtMm(model.casing.diameter)} mm`);
-    if (model.gravelTop != null) kv('Kavicsozás', `${fmtDepth(model.gravelTop)} m – talp`);
+    if (model.cementDepth != null) kv('Cementezés', `0,00–${fmtDepth(model.cementDepth)} m`);
+    if (model.gravelShown != null) kv('Kavics', `${fmtDepth(model.gravelShown)} m – talp`);
     if (model.groundMbf != null) kv('Terepszint', `${fmtDepth(model.groundMbf)} mBf`);
     if (model.waterM != null) kv('Nyugalmi vízszint', `${fmtDepth(model.waterM)} m`);
     ty += 1.6;
@@ -915,6 +966,8 @@
       casingDia: planText(source.casingDia),
       casingDepth: planText(source.casingDepth),
       gravelTop: planText(source.gravelTop),
+      cementOn: !!source.cementOn,
+      cementDepth: planText(source.cementDepth),
       sections: sections.map((section) => ({
         type: section && section.type === 'szuro' ? 'szuro' : 'teli',
         length: planText(section && section.length),
@@ -972,6 +1025,8 @@
       casingDia: planText(data.casingDia),
       casingDepth: planText(data.casingDepth),
       gravelTop: planText(data.gravelTop),
+      cementOn: data.cementOn === true || data.cementOn === 'true' || data.cementOn === 1,
+      cementDepth: planText(data.cementDepth),
       sections,
       pristineSample: false,
     };

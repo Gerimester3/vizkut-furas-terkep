@@ -142,7 +142,8 @@ input.bad, select.bad {
 
 .split label { margin-top: 0.55rem; }
 
-.casing-fields[hidden] { display: none; }
+.casing-fields[hidden],
+.cement-fields[hidden] { display: none; }
 
 .sections {
   display: flex;

@@ -3,6 +3,7 @@
   const form = document.getElementById('form');
   const sectionsEl = document.getElementById('sections');
   const casingFields = document.getElementById('casingFields');
+  const cementFields = document.getElementById('cementFields');
   const summaryEl = document.getElementById('summary');
   const issuesEl = document.getElementById('issues');
   const sheetEl = document.getElementById('sheet');
@@ -10,7 +11,7 @@
   const statusEl = document.getElementById('status');
   const sampleBanner = document.getElementById('sampleBanner');
 
-  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'gravelTop'];
+  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'gravelTop', 'cementOn', 'cementDepth'];
   let triedExport = false;
   let fontPromise = null;
 
@@ -35,6 +36,8 @@
       casingDia: '',
       casingDepth: '',
       gravelTop: '',
+      cementOn: false,
+      cementDepth: '',
       sections: [{ type: 'teli', length: '', diameter: '' }],
       pristineSample: false,
     };
@@ -55,6 +58,8 @@
       casingDia: '244',
       casingDepth: '12',
       gravelTop: '18',
+      cementOn: true,
+      cementDepth: '12',
       sections: [
         { type: 'teli', length: '8', diameter: '180' },
         { type: 'teli', length: '12', diameter: '125' },
@@ -74,6 +79,8 @@
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.sections) || !data.sections.length) return sampleState();
       if (data.casingMaterial !== 'muanyag') data.casingMaterial = 'acel';
+      data.cementOn = data.cementOn === true;
+      if (data.cementDepth == null) data.cementDepth = '';
       return data;
     } catch (err) {
       return sampleState();
@@ -96,6 +103,7 @@
       else el.value = state[id] == null ? '' : state[id];
     });
     casingFields.hidden = !state.casingOn;
+    cementFields.hidden = !state.cementOn;
     renderSections();
     refresh();
   }
@@ -321,6 +329,7 @@
     } else if (target.id && Object.prototype.hasOwnProperty.call(state, target.id)) {
       state[target.id] = target.type === 'checkbox' ? target.checked : target.value;
       if (target.id === 'casingOn') casingFields.hidden = !state.casingOn;
+      if (target.id === 'cementOn') cementFields.hidden = !state.cementOn;
     } else {
       return;
     }
