@@ -309,6 +309,28 @@
     }
   }
 
+  const menuToggle = document.getElementById('menuToggle');
+  const actionsEl = document.getElementById('actions');
+
+  function setMenuOpen(open) {
+    actionsEl.classList.toggle('is-open', open);
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  menuToggle.addEventListener('click', () => {
+    setMenuOpen(menuToggle.getAttribute('aria-expanded') !== 'true');
+  });
+
+  document.addEventListener('click', (event) => {
+    if (menuToggle.getAttribute('aria-expanded') !== 'true') return;
+    if (actionsEl.contains(event.target) || menuToggle.contains(event.target)) return;
+    setMenuOpen(false);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setMenuOpen(false);
+  });
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     downloadPdf();

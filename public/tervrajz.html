@@ -140,7 +140,11 @@
 
         <div id="issues" class="issues" role="status"></div>
 
-        <div class="actions">
+        <button type="button" class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="actions" aria-label="Műveletek">
+          <span class="menu-bars" aria-hidden="true"></span>
+        </button>
+
+        <div class="actions" id="actions">
           <button type="submit" id="pdfBtn" class="btn primary">PDF letöltése</button>
           <div class="action-row">
             <button type="button" id="savePlanBtn" class="btn secondary">Terv mentése</button>
