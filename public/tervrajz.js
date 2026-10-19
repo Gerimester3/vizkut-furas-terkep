@@ -3,6 +3,7 @@
   const form = document.getElementById('form');
   const sectionsEl = document.getElementById('sections');
   const casingFields = document.getElementById('casingFields');
+  const casing2Fields = document.getElementById('casing2Fields');
   const cementFields = document.getElementById('cementFields');
   const summaryEl = document.getElementById('summary');
   const issuesEl = document.getElementById('issues');
@@ -11,7 +12,7 @@
   const statusEl = document.getElementById('status');
   const sampleBanner = document.getElementById('sampleBanner');
 
-  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'gravelTop', 'cementOn', 'cementDepth'];
+  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'casing2On', 'casing2Material', 'casing2Dia', 'casing2Depth', 'gravelTop', 'cementOn', 'cementDepth'];
   let triedExport = false;
   let fontPromise = null;
 
@@ -35,6 +36,10 @@
       casingMaterial: 'acel',
       casingDia: '',
       casingDepth: '',
+      casing2On: false,
+      casing2Material: 'acel',
+      casing2Dia: '',
+      casing2Depth: '',
       gravelTop: '',
       cementOn: false,
       cementDepth: '',
@@ -57,6 +62,10 @@
       casingMaterial: 'acel',
       casingDia: '244',
       casingDepth: '12',
+      casing2On: false,
+      casing2Material: 'acel',
+      casing2Dia: '',
+      casing2Depth: '',
       gravelTop: '18',
       cementOn: true,
       cementDepth: '12',
@@ -79,6 +88,10 @@
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.sections) || !data.sections.length) return sampleState();
       if (data.casingMaterial !== 'muanyag') data.casingMaterial = 'acel';
+      data.casing2On = data.casing2On === true;
+      if (data.casing2Material !== 'muanyag') data.casing2Material = 'acel';
+      if (data.casing2Dia == null) data.casing2Dia = '';
+      if (data.casing2Depth == null) data.casing2Depth = '';
       data.cementOn = data.cementOn === true;
       if (data.cementDepth == null) data.cementDepth = '';
       return data;
@@ -103,6 +116,7 @@
       else el.value = state[id] == null ? '' : state[id];
     });
     casingFields.hidden = !state.casingOn;
+    casing2Fields.hidden = !state.casing2On;
     cementFields.hidden = !state.cementOn;
     renderSections();
     refresh();
@@ -351,6 +365,7 @@
     } else if (target.id && Object.prototype.hasOwnProperty.call(state, target.id)) {
       state[target.id] = target.type === 'checkbox' ? target.checked : target.value;
       if (target.id === 'casingOn') casingFields.hidden = !state.casingOn;
+      if (target.id === 'casing2On') casing2Fields.hidden = !state.casing2On;
       if (target.id === 'cementOn') cementFields.hidden = !state.cementOn;
     } else {
       return;

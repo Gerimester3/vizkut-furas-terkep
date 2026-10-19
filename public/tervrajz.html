@@ -101,6 +101,32 @@
                 <input id="casingDepth" type="number" min="0" step="any" inputmode="decimal" />
               </label>
             </div>
+            <label class="check">
+              <input id="casing2On" type="checkbox" />
+              Beépül másodlagos védőcső
+            </label>
+            <div id="casing2Fields" class="casing-fields" hidden>
+              <p class="hint">
+                A másodlagos védőcső is a talajszinttől a saját mélységéig tart. Anyag, átmérő és lehelyezési mélység ugyanúgy megadható. A szűkebb a tágabbon belül megy, a tágabb nem érhet mélyebbre.
+              </p>
+              <label>
+                Anyag
+                <select id="casing2Material">
+                  <option value="acel">Acél</option>
+                  <option value="muanyag">Műanyag (PVC)</option>
+                </select>
+              </label>
+              <div class="split">
+                <label>
+                  Átmérő (mm)
+                  <input id="casing2Dia" type="number" min="0" step="any" inputmode="decimal" />
+                </label>
+                <label>
+                  Lehelyezési mélység (m)
+                  <input id="casing2Depth" type="number" min="0" step="any" inputmode="decimal" />
+                </label>
+              </div>
+            </div>
           </div>
         </section>
 

@@ -209,6 +209,40 @@
       }
     }
 
+    let casing2 = null;
+    if (casing && input.casing2On) {
+      const casingDia = parseNum(input.casing2Dia);
+      const casingDepth = parseNum(input.casing2Depth);
+      if (casingDia == null) err('casing2Dia', 'Add meg a másodlagos védőcső átmérőjét.');
+      else if (Number.isNaN(casingDia) || casingDia <= 0) err('casing2Dia', 'A másodlagos védőcső átmérője legyen 0-nál nagyobb.');
+      else if (casingDia > 2000) err('casing2Dia', 'A másodlagos védőcső átmérője legfeljebb 2000 mm lehet.');
+      if (casingDepth == null) err('casing2Depth', 'Add meg, milyen mélyre van lehelyezve a másodlagos védőcső.');
+      else if (Number.isNaN(casingDepth) || casingDepth <= 0) {
+        err('casing2Depth', 'A másodlagos védőcső lehelyezési mélysége legyen 0-nál nagyobb.');
+      } else if (depth != null && !Number.isNaN(depth) && casingDepth > depth + 0.001) {
+        err('casing2Depth', 'A másodlagos védőcső nem érhet a talp alá.');
+      }
+      if (!errors.some((e) => e.field === 'casing2Dia' || e.field === 'casing2Depth') && casingDia != null && casingDepth != null) {
+        const material = input.casing2Material === 'muanyag' ? 'muanyag' : 'acel';
+        casing2 = { diameter: casingDia, depth: casingDepth, material };
+      }
+    }
+    if (casing && casing2) {
+      if (Math.abs(casing.diameter - casing2.diameter) <= 0.05) {
+        err('casing2Dia', 'A két védőcső átmérője nem lehet ugyanakkora, mert egymásba kerülnek.');
+      } else {
+        const widerIsPrimary = casing.diameter > casing2.diameter;
+        const wider = widerIsPrimary ? casing : casing2;
+        const narrower = widerIsPrimary ? casing2 : casing;
+        if (wider.depth > narrower.depth + 0.001) {
+          err(
+            widerIsPrimary ? 'casingDepth' : 'casing2Depth',
+            'A tágabb védőcső nem érhet mélyebbre a szűkebbnél, mert azon a lyukon nem fér le.'
+          );
+        }
+      }
+    }
+
     const rawSections = Array.isArray(input.sections) ? input.sections.slice() : [];
     while (rawSections.length && isBlankSection(rawSections[rawSections.length - 1])) rawSections.pop();
 
@@ -230,8 +264,10 @@
         err(`section:${index}:length`, `${index + 1}. szakasz: a hossz legyen 0-nál nagyobb.`);
       }
       const sectionBottom = length != null && !Number.isNaN(length) && length > 0 ? cursor + length : null;
-      const reducedHole = casing && bore != null && !Number.isNaN(bore) && casing.diameter > bore + 0.05;
-      const entersLowerHole = sectionBottom == null || !reducedHole || sectionBottom > casing.depth + 0.001;
+      const wideners = [casing, casing2].filter((pipe) => pipe && bore != null && !Number.isNaN(bore) && pipe.diameter > bore + 0.05);
+      const reducedHole = wideners.length > 0;
+      const shoeForHole = wideners.reduce((max, pipe) => Math.max(max, pipe.depth), 0);
+      const entersLowerHole = sectionBottom == null || !reducedHole || sectionBottom > shoeForHole + 0.001;
       if (diameter == null) err(`section:${index}:diameter`, `${index + 1}. szakasz: add meg az átmérőt.`);
       else if (Number.isNaN(diameter) || diameter <= 0) {
         err(`section:${index}:diameter`, `${index + 1}. szakasz: az átmérő legyen 0-nál nagyobb.`);
@@ -246,6 +282,11 @@
         err(
           `section:${index}:diameter`,
           `${index + 1}. szakasz: a béléscső kisebb legyen a védőcsőnél (${fmtMm(casing.diameter)} mm), mert azon belül megy.`
+        );
+      } else if (casing2 && diameter >= casing2.diameter) {
+        err(
+          `section:${index}:diameter`,
+          `${index + 1}. szakasz: a béléscső kisebb legyen a másodlagos védőcsőnél (${fmtMm(casing2.diameter)} mm), mert azon belül megy.`
         );
       }
       if (type && length != null && !Number.isNaN(length) && length > 0 && diameter != null && !Number.isNaN(diameter) && diameter > 0) {
@@ -276,11 +317,18 @@
 
     const stepped = !!(casing && casing.diameter > bore + 0.05);
     const flush = !!(casing && Math.abs(casing.diameter - bore) <= 0.05);
-    if (stepped) {
+    if (stepped && !casing2) {
       notes.push(`A fúrat a védőcső alatt ${fmtMm(bore)} mm-re szűkül.`);
     }
-    if (flush) {
+    if (flush && !casing2) {
       notes.push('A védőcső és a fúrat azonos átmérőjű, vastag külső vonal jelöli.');
+    }
+    if (casing2) {
+      const secondName = casing2.material === 'muanyag' ? 'műanyag' : 'acél';
+      notes.push(`Másodlagos ${secondName} védőcső Ø ${fmtMm(casing2.diameter)} mm, a talajszinttől ${fmtDepth(casing2.depth)} m-ig.`);
+      if ([casing, casing2].some((pipe) => pipe.diameter > bore + 0.05)) {
+        notes.push(`A fúrat a védőcsövek alatt ${fmtMm(bore)} mm-re szűkül.`);
+      }
     }
     const gravelShown = gravel != null && !Number.isNaN(gravel)
       ? (cement != null ? Math.max(gravel, cement) : gravel)
@@ -335,6 +383,7 @@
         stepped,
         flush,
         casing,
+        casing2,
         sections: built,
         openHole,
         filters,
@@ -396,6 +445,66 @@
     return { linerOuters, caseOuter, upperBore, lowerBore, stepped, flush };
   }
 
+  function casingPaint(material) {
+    const plastic = material === 'muanyag';
+    return {
+      plastic,
+      color: plastic ? '#1d4ed8' : CASING,
+      shoe: plastic ? '#1e3a8a' : '#27272a',
+      name: plastic ? 'Műanyag védőcső' : 'Acél védőcső',
+    };
+  }
+
+  function secondLayout(model) {
+    const casings = [model.casing, model.casing2];
+    const upperBore = BORE_HALF - 0.15;
+    const bore = model.boreMm;
+    const depth = model.depth;
+    const cuts = [0, depth];
+    casings.forEach((pipe) => {
+      if (pipe.depth > 0.02 && pipe.depth < depth - 0.02) cuts.push(pipe.depth);
+    });
+    cuts.sort((a, b) => a - b);
+    const points = [];
+    cuts.forEach((value) => {
+      if (!points.length || value - points[points.length - 1] > 0.02) points.push(value);
+    });
+    const segments = [];
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const from = points[i];
+      const to = points[i + 1];
+      let diameter = bore;
+      casings.forEach((pipe) => {
+        if (pipe.depth + 0.001 >= to && pipe.diameter > diameter) diameter = pipe.diameter;
+      });
+      segments.push({ from, to, diameter });
+    }
+    const maxDia = Math.max(...segments.map((segment) => segment.diameter));
+    segments.forEach((segment) => {
+      segment.half = (segment.diameter / maxDia) * upperBore;
+    });
+    const ordered = casings.slice().sort((a, b) => b.diameter - a.diameter);
+    let limit = null;
+    const visuals = ordered.map((pipe) => {
+      const paint = casingPaint(pipe.material);
+      let outer;
+      if (Math.abs(pipe.diameter - bore) <= 0.05) outer = (bore / maxDia) * upperBore;
+      else if (Math.abs(pipe.diameter - maxDia) <= 0.05) outer = upperBore - 1.05;
+      else outer = (pipe.diameter / maxDia) * upperBore - 0.35;
+      if (limit != null) outer = Math.min(outer, limit - 1.5);
+      outer = Math.max(3.4, outer);
+      limit = Math.abs(pipe.diameter - bore) <= 0.05 ? outer - 2.3 : outer - 1.25;
+      return {
+        casing: pipe,
+        outer,
+        secondary: pipe === model.casing2,
+        ...paint,
+        name: pipe === model.casing2 ? `Másodlagos ${paint.name.toLowerCase()}` : paint.name,
+      };
+    });
+    return { segments, visuals, upperBore };
+  }
+
   function buildCommands(model) {
     const cmds = [];
     const add = (cmd) => cmds.push(cmd);
@@ -424,7 +533,18 @@
     const drawH = TALP_Y - GROUND_Y;
     const yAt = (depth) => GROUND_Y + (depth / model.depth) * drawH;
     const mmPerM = drawH / model.depth;
-    const { linerOuters, caseOuter, upperBore, lowerBore, stepped, flush } = visualOuters(model);
+    const layout = model.casing2 ? secondLayout(model) : null;
+    let { linerOuters, caseOuter, upperBore, lowerBore, stepped, flush } = visualOuters(model);
+    if (layout) {
+      linerOuters = linerOuters.map((value, index) => {
+        const section = model.sections[index];
+        const covering = layout.visuals.filter((item) => section.top < item.casing.depth - 0.001);
+        if (!covering.length) return value;
+        const innerMost = covering.reduce((a, b) => (a.casing.diameter <= b.casing.diameter ? a : b));
+        const cap = innerMost.outer - 1.25 - 0.9;
+        return Math.max(2.2, Math.min(value, cap));
+      });
+    }
     const plastic = !!(model.casing && model.casing.material === 'muanyag');
     const casingColor = plastic ? '#1d4ed8' : CASING;
     const casingShoe = plastic ? '#1e3a8a' : '#27272a';
@@ -460,19 +580,40 @@
 
     const shoeDepth = stepped ? model.casing.depth : model.depth;
     const yShoe = yAt(shoeDepth);
-    rect(CENTER_X - upperBore, GROUND_Y, upperBore * 2, Math.max(0.2, yShoe - GROUND_Y), BORE_FILL, null, 0);
-    if (stepped) {
-      rect(CENTER_X - lowerBore, yShoe, lowerBore * 2, Math.max(0.2, TALP_Y - yShoe), BORE_FILL, null, 0);
+    if (layout) {
+      layout.segments.forEach((segment) => {
+        const y0 = yAt(segment.from);
+        const y1 = yAt(segment.to);
+        rect(CENTER_X - segment.half, y0, segment.half * 2, Math.max(0.2, y1 - y0), BORE_FILL, null, 0);
+      });
+    } else {
+      rect(CENTER_X - upperBore, GROUND_Y, upperBore * 2, Math.max(0.2, yShoe - GROUND_Y), BORE_FILL, null, 0);
+      if (stepped) {
+        rect(CENTER_X - lowerBore, yShoe, lowerBore * 2, Math.max(0.2, TALP_Y - yShoe), BORE_FILL, null, 0);
+      }
     }
 
     const step = niceStep(model.depth, Math.max(5, Math.round(drawH / 16)));
     for (let depth = step; depth < model.depth - step * 0.25; depth += step) {
       const y = yAt(depth);
-      const half = stepped && depth > model.casing.depth ? lowerBore : upperBore;
+      let half = stepped && depth > model.casing.depth ? lowerBore : upperBore;
+      if (layout) {
+        const segment = layout.segments.find((item) => depth > item.from + 0.001 && depth <= item.to + 0.001) || layout.segments[0];
+        half = segment.half;
+      }
       line(CENTER_X - half, y, CENTER_X + half, y, GRID, 0.2);
     }
 
-    if (caseOuter != null && !flush) {
+    if (layout) {
+      const innerPipe = layout.visuals[layout.visuals.length - 1];
+      const matchesBore = Math.abs(innerPipe.casing.diameter - model.boreMm) <= 0.05;
+      if (!matchesBore) {
+        const y0 = yAt(0);
+        const y1 = yAt(Math.min(innerPipe.casing.depth, model.depth));
+        const inner = innerPipe.outer - caseWall;
+        rect(CENTER_X - inner, y0, inner * 2, Math.max(0.2, y1 - y0), ANNULUS, null, 0);
+      }
+    } else if (caseOuter != null && !flush) {
       const y0 = yAt(0);
       const y1 = yAt(model.casing.depth);
       const inner = caseOuter - caseWall;
@@ -486,7 +627,9 @@
         if (section.top > fromDepth && section.top < toDepth) cuts.push(section.top);
         if (section.bottom > fromDepth && section.bottom < toDepth) cuts.push(section.bottom);
       });
-      if (model.casing && model.casing.depth > fromDepth && model.casing.depth < toDepth) cuts.push(model.casing.depth);
+      [model.casing, model.casing2].forEach((pipe) => {
+        if (pipe && pipe.depth > fromDepth && pipe.depth < toDepth) cuts.push(pipe.depth);
+      });
       cuts.push(toDepth);
       cuts.sort((a, b) => a - b);
       for (let i = 0; i < cuts.length - 1; i += 1) {
@@ -497,10 +640,25 @@
         const sectionIndex = model.sections.findIndex((section) => mid >= section.top - 0.001 && mid <= section.bottom + 0.001);
         if (sectionIndex < 0) continue;
         const innerHalf = linerOuters[sectionIndex];
-        const insideCasing = model.casing && mid <= model.casing.depth + 0.001;
-        const outerHalf = insideCasing
-          ? (flush ? upperBore - 1.55 : caseOuter - caseWall - 0.35)
-          : (stepped ? lowerBore : upperBore) - 0.25;
+        let outerHalf;
+        if (layout) {
+          const covering = layout.visuals.filter((item) => mid <= item.casing.depth + 0.001);
+          const segment = layout.segments.find((item) => mid >= item.from - 0.001 && mid <= item.to + 0.001);
+          if (covering.length) {
+            const innerMost = covering.reduce((a, b) => (a.casing.diameter <= b.casing.diameter ? a : b));
+            const onBoreWall = segment
+              && Math.abs(innerMost.casing.diameter - model.boreMm) <= 0.05
+              && Math.abs(segment.diameter - model.boreMm) <= 0.05;
+            outerHalf = onBoreWall ? segment.half - 1.55 : innerMost.outer - caseWall - 0.35;
+          } else {
+            outerHalf = (segment ? segment.half : upperBore) - 0.25;
+          }
+        } else {
+          const insideCasing = model.casing && mid <= model.casing.depth + 0.001;
+          outerHalf = insideCasing
+            ? (flush ? upperBore - 1.55 : caseOuter - caseWall - 0.35)
+            : (stepped ? lowerBore : upperBore) - 0.25;
+        }
         if (outerHalf - innerHalf < 0.65) continue;
         paint(top, bottom, innerHalf, outerHalf);
       }
@@ -576,7 +734,62 @@
       }
     }
 
-    if (caseOuter != null) {
+    if (layout) {
+      layout.visuals.forEach((item) => {
+        const endDepth = Math.min(item.casing.depth, model.depth);
+        const yEnd = yAt(endDepth);
+        const shoe = Math.min(1.7, Math.max(0.4, yEnd - yAt(0)));
+        layout.segments.forEach((segment) => {
+          const from = Math.max(segment.from, 0);
+          const to = Math.min(segment.to, endDepth);
+          if (to - from < 0.02) return;
+          const y0 = yAt(from);
+          const y1 = yAt(to);
+          const onBoreWall = Math.abs(item.casing.diameter - model.boreMm) <= 0.05
+            && Math.abs(segment.diameter - model.boreMm) <= 0.05;
+          if (onBoreWall) {
+            line(CENTER_X - segment.half, y0, CENTER_X - segment.half, y1, item.color, 2.2);
+            line(CENTER_X + segment.half, y0, CENTER_X + segment.half, y1, item.color, 2.2);
+          } else {
+            rect(CENTER_X - item.outer, y0, caseWall, y1 - y0, item.color, null, 0);
+            rect(CENTER_X + item.outer - caseWall, y0, caseWall, y1 - y0, item.color, null, 0);
+          }
+        });
+        const endSeg = layout.segments.find((segment) => endDepth <= segment.to + 0.001 && endDepth >= segment.from - 0.001)
+          || layout.segments[layout.segments.length - 1];
+        const shoeOnWall = Math.abs(item.casing.diameter - model.boreMm) <= 0.05
+          && endSeg && Math.abs(endSeg.diameter - model.boreMm) <= 0.05;
+        const shoeOuter = shoeOnWall ? endSeg.half : item.outer;
+        const shoeW = shoeOnWall ? 2.2 : caseWall + 0.5;
+        if (shoeOnWall) {
+          rect(CENTER_X - shoeOuter - shoeW / 2, yEnd - shoe, shoeW, shoe, item.shoe, null, 0);
+          rect(CENTER_X + shoeOuter - shoeW / 2, yEnd - shoe, shoeW, shoe, item.shoe, null, 0);
+        } else {
+          rect(CENTER_X - shoeOuter - 0.25, yEnd - shoe, shoeW, shoe, item.shoe, null, 0);
+          rect(CENTER_X + shoeOuter - caseWall - 0.25, yEnd - shoe, shoeW, shoe, item.shoe, null, 0);
+        }
+      });
+      layout.segments.forEach((segment, index) => {
+        const y0 = yAt(segment.from);
+        const y1 = yAt(segment.to);
+        const covered = layout.visuals.some((item) => (
+          Math.abs(item.casing.diameter - model.boreMm) <= 0.05
+          && Math.abs(segment.diameter - model.boreMm) <= 0.05
+          && item.casing.depth + 0.001 >= segment.to
+        ));
+        if (!covered) {
+          line(CENTER_X - segment.half, y0, CENTER_X - segment.half, y1, BORE_LINE, 0.55);
+          line(CENTER_X + segment.half, y0, CENTER_X + segment.half, y1, BORE_LINE, 0.55);
+        }
+        const next = layout.segments[index + 1];
+        if (next && Math.abs(next.half - segment.half) > 0.05) {
+          line(CENTER_X - segment.half, y1, CENTER_X - next.half, y1, BORE_LINE, 0.7);
+          line(CENTER_X + next.half, y1, CENTER_X + segment.half, y1, BORE_LINE, 0.7);
+        }
+      });
+      const lastHalf = layout.segments[layout.segments.length - 1].half;
+      line(CENTER_X - lastHalf, TALP_Y, CENTER_X + lastHalf, TALP_Y, BORE_LINE, 0.7);
+    } else if (caseOuter != null) {
       const y0 = yAt(0);
       const y1 = yAt(model.casing.depth);
       const shoe = Math.min(1.7, Math.max(0.4, y1 - y0));
@@ -594,13 +807,13 @@
       }
     }
 
-    if (flush) {
+    if (!layout && flush) {
       const yCase = yAt(model.casing.depth);
       if (model.casing.depth < model.depth - 0.01) {
         line(CENTER_X - upperBore, yCase, CENTER_X - upperBore, TALP_Y, BORE_LINE, 0.55);
         line(CENTER_X + upperBore, yCase, CENTER_X + upperBore, TALP_Y, BORE_LINE, 0.55);
       }
-    } else {
+    } else if (!layout) {
       line(CENTER_X - upperBore, GROUND_Y, CENTER_X - upperBore, yShoe, BORE_LINE, 0.55);
       line(CENTER_X + upperBore, GROUND_Y, CENTER_X + upperBore, yShoe, BORE_LINE, 0.55);
       if (stepped) {
@@ -610,8 +823,10 @@
         line(CENTER_X + lowerBore, yShoe, CENTER_X + lowerBore, TALP_Y, BORE_LINE, 0.55);
       }
     }
-    const bottomHalf = stepped ? lowerBore : upperBore;
-    line(CENTER_X - bottomHalf, TALP_Y, CENTER_X + bottomHalf, TALP_Y, BORE_LINE, 0.7);
+    if (!layout) {
+      const bottomHalf = stepped ? lowerBore : upperBore;
+      line(CENTER_X - bottomHalf, TALP_Y, CENTER_X + bottomHalf, TALP_Y, BORE_LINE, 0.7);
+    }
 
     const hatchX = CENTER_X - upperBore - 8;
     const hatchW = (upperBore + 8) * 2;
@@ -661,9 +876,9 @@
       if (section.top > 0.005) ticks.push({ depth: section.top, priority: 1, kind: 'bound' });
     });
     if (model.openHole) ticks.push({ depth: model.openHole.top, priority: 1, kind: 'bound' });
-    if (model.casing && model.casing.depth < model.depth - 0.01) {
-      ticks.push({ depth: model.casing.depth, priority: 2, kind: 'bound' });
-    }
+    [model.casing, model.casing2].forEach((pipe) => {
+      if (pipe && pipe.depth < model.depth - 0.01) ticks.push({ depth: pipe.depth, priority: 2, kind: 'bound' });
+    });
     if (model.gravelShown != null) ticks.push({ depth: model.gravelShown, priority: 1, kind: 'bound' });
     if (model.cementDepth != null && model.cementDepth < model.depth - 0.01) {
       ticks.push({ depth: model.cementDepth, priority: 2, kind: 'bound' });
@@ -695,6 +910,14 @@
         color: plastic ? casingColor : '#000000',
       });
     }
+    if (model.casing2 && layout) {
+      const second = layout.visuals.find((item) => item.secondary);
+      callouts.push({
+        anchorY: (yAt(0) + yAt(model.casing2.depth)) / 2,
+        lines: [second.name, `Ø ${fmtMm(model.casing2.diameter)} mm`],
+        color: second.plastic ? second.color : '#000000',
+      });
+    }
     model.sections.forEach((section) => {
       callouts.push({
         anchorY: (yAt(section.top) + yAt(section.bottom)) / 2,
@@ -709,9 +932,12 @@
         color: MUTED,
       });
     }
-    if (stepped) {
+    const stepFrom = layout
+      ? layout.segments.reduce((max, segment) => (segment.diameter > model.boreMm + 0.05 ? Math.max(max, segment.to) : max), 0)
+      : (stepped ? model.casing.depth : 0);
+    if (stepFrom > 0.01 && stepFrom < model.depth - 0.01) {
       callouts.push({
-        anchorY: (yAt(model.casing.depth) + yAt(model.depth)) / 2,
+        anchorY: (yAt(stepFrom) + yAt(model.depth)) / 2,
         lines: ['Fúrat szűkül', `Ø ${fmtMm(model.boreMm)} mm`],
         color: '#000000',
       });
@@ -775,6 +1001,10 @@
       [BLANK_FILL, BLANK_LINE, 'Teli'],
       [SCREEN_FILL, SCREEN_LINE, 'Szűrő'],
     ];
+    if (model.casing2 && model.casing.material !== model.casing2.material) {
+      const plastic2 = model.casing2.material === 'muanyag';
+      legend.splice(2, 0, [plastic2 ? '#1d4ed8' : CASING, plastic2 ? '#1d4ed8' : CASING, plastic2 ? 'Műanyag' : 'Acél']);
+    }
     if (model.gravelShown != null) legend.push(['#e7e5e4', '#78716c', 'Kavics']);
     if (model.cementDepth != null) legend.push([CEMENT, '#737373', 'Cement']);
     const legendW = (FRAME_R - TABLE_X - 4) / legend.length;
@@ -785,11 +1015,14 @@
     });
     ty += 8;
 
-    const metaRows = 2 + (model.stepped ? 1 : 0) + (model.gravelShown != null ? 1 : 0) + (model.cementDepth != null ? 1 : 0) + (model.groundMbf != null ? 1 : 0) + (model.waterM != null ? 1 : 0);
-    const casingRows = model.casing ? 2 : 1;
+    const wideRows = layout
+      ? layout.segments.filter((segment) => segment.diameter > model.boreMm + 0.05)
+      : [];
+    const metaRows = 2 + (layout ? wideRows.length : (model.stepped ? 1 : 0)) + (model.gravelShown != null ? 1 : 0) + (model.cementDepth != null ? 1 : 0) + (model.groundMbf != null ? 1 : 0) + (model.waterM != null ? 1 : 0);
+    const casingRows = (model.casing ? 2 : 1) + (model.casing2 ? 2 : 0);
     const filterRows = Math.max(1, model.filters.length);
     const bodyRows = metaRows + casingRows + 1 + model.sections.length + filterRows;
-    const headings = 4;
+    const headings = 4 + (model.casing2 ? 1 : 0);
     const available = FOOT_Y - 2 - ty - headings * 6.2 - 6;
     const pitch = Math.max(3.15, Math.min(4.7, available / Math.max(1, bodyRows)));
 
@@ -808,8 +1041,13 @@
 
     heading('Kiképzés');
     kv('Talpmélység', `${fmtDepth(model.depth)} m`);
-    kv(model.stepped ? 'Fúrat a védőcső alatt' : 'Fúrat Ø', `${fmtMm(model.boreMm)} mm`);
-    if (model.stepped) kv('Fúrat a saruig', `Ø ${fmtMm(model.casing.diameter)} mm`);
+    const holeSteps = layout ? wideRows.length > 0 : model.stepped;
+    kv(holeSteps ? 'Fúrat a védőcső alatt' : 'Fúrat Ø', `${fmtMm(model.boreMm)} mm`);
+    if (layout) {
+      wideRows.forEach((segment) => {
+        kv(`Fúrat ${fmtDepth(segment.from)}–${fmtDepth(segment.to)} m`, `Ø ${fmtMm(segment.diameter)} mm`);
+      });
+    } else if (model.stepped) kv('Fúrat a saruig', `Ø ${fmtMm(model.casing.diameter)} mm`);
     if (model.cementDepth != null) kv('Cementezés', `0,00–${fmtDepth(model.cementDepth)} m`);
     if (model.gravelShown != null) kv('Kavics', `${fmtDepth(model.gravelShown)} m – talp`);
     if (model.groundMbf != null) kv('Terepszint', `${fmtDepth(model.groundMbf)} mBf`);
@@ -821,6 +1059,13 @@
     else {
       kv('Átmérő', `${fmtMm(model.casing.diameter)} mm`);
       kv('Lehelyezés', `0,00–${fmtDepth(model.casing.depth)} m`);
+    }
+    if (model.casing2 && layout) {
+      const second = layout.visuals.find((item) => item.secondary);
+      ty += 1.6;
+      heading(second.name);
+      kv('Átmérő', `${fmtMm(model.casing2.diameter)} mm`);
+      kv('Lehelyezés', `0,00–${fmtDepth(model.casing2.depth)} m`);
     }
     ty += 1.6;
 
@@ -965,6 +1210,10 @@
       casingMaterial: source.casingMaterial === 'muanyag' ? 'muanyag' : 'acel',
       casingDia: planText(source.casingDia),
       casingDepth: planText(source.casingDepth),
+      casing2On: !!source.casing2On,
+      casing2Material: source.casing2Material === 'muanyag' ? 'muanyag' : 'acel',
+      casing2Dia: planText(source.casing2Dia),
+      casing2Depth: planText(source.casing2Depth),
       gravelTop: planText(source.gravelTop),
       cementOn: !!source.cementOn,
       cementDepth: planText(source.cementDepth),
@@ -1024,6 +1273,10 @@
       casingMaterial: casingMaterialOf(data.casingMaterial),
       casingDia: planText(data.casingDia),
       casingDepth: planText(data.casingDepth),
+      casing2On: data.casing2On === true || data.casing2On === 'true' || data.casing2On === 1,
+      casing2Material: casingMaterialOf(data.casing2Material),
+      casing2Dia: planText(data.casing2Dia),
+      casing2Depth: planText(data.casing2Depth),
       gravelTop: planText(data.gravelTop),
       cementOn: data.cementOn === true || data.cementOn === 'true' || data.cementOn === 1,
       cementDepth: planText(data.cementDepth),

@@ -145,6 +145,12 @@ input.bad, select.bad {
 .casing-fields[hidden],
 .cement-fields[hidden] { display: none; }
 
+.casing-fields .casing-fields {
+  margin-top: 0.35rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--panel-border);
+}
+
 .sections {
   display: flex;
   flex-direction: column;
