@@ -102,6 +102,19 @@
               </label>
             </div>
             <label class="check">
+              <input id="casingCementOn" type="checkbox" />
+              Külső cementezés
+            </label>
+            <div id="casingCementFields" class="cement-fields" hidden>
+              <p class="hint">
+                A cement a védőcső külső oldalán van, a cső és a fúrat fala között, a felszíntől lefelé. A sarunál véget ér.
+              </p>
+              <label>
+                A felszíntől eddig (m)
+                <input id="casingCementDepth" type="number" min="0" step="any" inputmode="decimal" />
+              </label>
+            </div>
+            <label class="check">
               <input id="casing2On" type="checkbox" />
               Beépül másodlagos védőcső
             </label>
@@ -124,6 +137,19 @@
                 <label>
                   Lehelyezési mélység (m)
                   <input id="casing2Depth" type="number" min="0" step="any" inputmode="decimal" />
+                </label>
+              </div>
+              <label class="check">
+                <input id="casing2CementOn" type="checkbox" />
+                Külső cementezés
+              </label>
+              <div id="casing2CementFields" class="cement-fields" hidden>
+                <p class="hint">
+                  A cement ennek a védőcsőnek a külső oldalán van, a felszíntől lefelé. A sarunál véget ér.
+                </p>
+                <label>
+                  A felszíntől eddig (m)
+                  <input id="casing2CementDepth" type="number" min="0" step="any" inputmode="decimal" />
                 </label>
               </div>
             </div>

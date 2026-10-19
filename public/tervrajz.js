@@ -4,6 +4,8 @@
   const sectionsEl = document.getElementById('sections');
   const casingFields = document.getElementById('casingFields');
   const casing2Fields = document.getElementById('casing2Fields');
+  const casingCementFields = document.getElementById('casingCementFields');
+  const casing2CementFields = document.getElementById('casing2CementFields');
   const cementFields = document.getElementById('cementFields');
   const summaryEl = document.getElementById('summary');
   const issuesEl = document.getElementById('issues');
@@ -12,7 +14,7 @@
   const statusEl = document.getElementById('status');
   const sampleBanner = document.getElementById('sampleBanner');
 
-  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'casing2On', 'casing2Material', 'casing2Dia', 'casing2Depth', 'gravelTop', 'cementOn', 'cementDepth'];
+  const scalarIds = ['name', 'place', 'date', 'ground', 'water', 'note', 'depth', 'bore', 'casingOn', 'casingMaterial', 'casingDia', 'casingDepth', 'casingCementOn', 'casingCementDepth', 'casing2On', 'casing2Material', 'casing2Dia', 'casing2Depth', 'casing2CementOn', 'casing2CementDepth', 'gravelTop', 'cementOn', 'cementDepth'];
   let triedExport = false;
   let fontPromise = null;
 
@@ -36,10 +38,14 @@
       casingMaterial: 'acel',
       casingDia: '',
       casingDepth: '',
+      casingCementOn: false,
+      casingCementDepth: '',
       casing2On: false,
       casing2Material: 'acel',
       casing2Dia: '',
       casing2Depth: '',
+      casing2CementOn: false,
+      casing2CementDepth: '',
       gravelTop: '',
       cementOn: false,
       cementDepth: '',
@@ -62,10 +68,14 @@
       casingMaterial: 'acel',
       casingDia: '244',
       casingDepth: '12',
+      casingCementOn: false,
+      casingCementDepth: '',
       casing2On: false,
       casing2Material: 'acel',
       casing2Dia: '',
       casing2Depth: '',
+      casing2CementOn: false,
+      casing2CementDepth: '',
       gravelTop: '18',
       cementOn: true,
       cementDepth: '12',
@@ -92,6 +102,10 @@
       if (data.casing2Material !== 'muanyag') data.casing2Material = 'acel';
       if (data.casing2Dia == null) data.casing2Dia = '';
       if (data.casing2Depth == null) data.casing2Depth = '';
+      data.casingCementOn = data.casingCementOn === true;
+      if (data.casingCementDepth == null) data.casingCementDepth = '';
+      data.casing2CementOn = data.casing2CementOn === true;
+      if (data.casing2CementDepth == null) data.casing2CementDepth = '';
       data.cementOn = data.cementOn === true;
       if (data.cementDepth == null) data.cementDepth = '';
       return data;
@@ -117,6 +131,8 @@
     });
     casingFields.hidden = !state.casingOn;
     casing2Fields.hidden = !state.casing2On;
+    casingCementFields.hidden = !state.casingCementOn;
+    casing2CementFields.hidden = !state.casing2CementOn;
     cementFields.hidden = !state.cementOn;
     renderSections();
     refresh();
@@ -366,6 +382,8 @@
       state[target.id] = target.type === 'checkbox' ? target.checked : target.value;
       if (target.id === 'casingOn') casingFields.hidden = !state.casingOn;
       if (target.id === 'casing2On') casing2Fields.hidden = !state.casing2On;
+      if (target.id === 'casingCementOn') casingCementFields.hidden = !state.casingCementOn;
+      if (target.id === 'casing2CementOn') casing2CementFields.hidden = !state.casing2CementOn;
       if (target.id === 'cementOn') cementFields.hidden = !state.cementOn;
     } else {
       return;
